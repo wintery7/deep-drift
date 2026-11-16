@@ -1,0 +1,17 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "ocean-server",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev:server", "--prefix", "C:/workspaces/deep-drift"],
+      "port": 2567
+    },
+    {
+      "name": "client",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev:client", "--prefix", "C:/workspaces/deep-drift"],
+      "port": 5173
+    }
+  ]
+}

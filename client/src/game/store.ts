@@ -1,0 +1,85 @@
+import { useSyncExternalStore } from "react";
+import { WORLD } from "../../../shared/world.ts";
+
+export type Phase = "menu" | "playing";
+export type NetStatus = "offline" | "connecting" | "online" | "reconnecting";
+
+export interface GameState {
+  phase: Phase;
+  paused: boolean;
+  /** 환경음 볼륨 0..1 */
+  ambientVol: number;
+  /** 효과음 볼륨 0..1 */
+  sfxVol: number;
+  muted: boolean;
+  /** 해파리 외형 */
+  variant: number;
+  net: NetStatus;
+  /** 같은 방에 있는 다른 해파리 수 */
+  others: number;
+}
+
+const STORAGE_KEY = "deep-drift:prefs";
+
+function loadPrefs(): Partial<GameState> {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return {};
+    const p = JSON.parse(raw) as Record<string, unknown>;
+    const out: Partial<GameState> = {};
+    if (typeof p.ambientVol === "number") out.ambientVol = Math.min(1, Math.max(0, p.ambientVol));
+    if (typeof p.sfxVol === "number") out.sfxVol = Math.min(1, Math.max(0, p.sfxVol));
+    if (typeof p.muted === "boolean") out.muted = p.muted;
+    if (typeof p.variant === "number" && Number.isInteger(p.variant) && p.variant >= 0 && p.variant < WORLD.variants) {
+      out.variant = p.variant;
+    }
+    return out;
+  } catch {
+    return {};
+  }
+}
+
+let state: GameState = {
+  phase: "menu",
+  paused: false,
+  ambientVol: 0.7,
+  sfxVol: 0.6,
+  muted: false,
+  // 첫 방문자는 외형을 자동 배정받는다.
+  variant: Math.floor(Math.random() * WORLD.variants),
+  net: "offline",
+  others: 0,
+  ...loadPrefs(),
+};
+
+const listeners = new Set<() => void>();
+
+function persist() {
+  try {
+    const { ambientVol, sfxVol, muted, variant } = state;
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({ ambientVol, sfxVol, muted, variant }));
+  } catch {
+    // 저장 불가(사생활 보호 모드 등)여도 플레이에는 지장 없음
+  }
+}
+persist();
+
+export const getState = () => state;
+
+export function setState(patch: Partial<GameState>) {
+  state = { ...state, ...patch };
+  persist();
+  listeners.forEach((l) => l());
+}
+
+export function subscribe(listener: () => void) {
+  listeners.add(listener);
+  return () => {
+    listeners.delete(listener);
+  };
+}
+
+/** 원시값을 돌려주는 selector만 사용한다. */
+export function useGame<T>(selector: (s: GameState) => T): T {
+  return useSyncExternalStore(subscribe, () => selector(state));
+}

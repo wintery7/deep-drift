@@ -1,0 +1,17 @@
+{
+  "name": "deep-drift",
+  "private": true,
+  "version": "0.1.0",
+  "description": "DEEP DRIFT — Drift together, in silence.",
+  "workspaces": [
+    "client",
+    "server"
+  ],
+  "scripts": {
+    "dev:server": "npm run dev -w server",
+    "dev:client": "npm run dev -w client",
+    "build": "npm run build -w client",
+    "typecheck": "npm run typecheck -w client && npm run typecheck -w server",
+    "start": "npm run start -w server"
+  }
+}
