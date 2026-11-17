@@ -1,9 +1,11 @@
 import { PUBLIC_SEA } from "../../../shared/world.ts";
+import { randomNameParts } from "../../../shared/names.ts";
 import { audio } from "../audio/AudioEngine.ts";
 import { network } from "../net/network.ts";
 import { clearInput } from "./input.ts";
 import { runtime } from "./runtime.ts";
 import { getState, setState, subscribe } from "./store.ts";
+import { toast } from "./toast.ts";
 
 /** 심해 입장 — 버튼 클릭(사용자 제스처) 안에서 호출되어 오디오를 깨운다. */
 export function enterOcean() {
@@ -33,16 +35,27 @@ export function setPaused(paused: boolean) {
 // 안내 문구
 // ---------------------------------------------------------------------
 
-let toastTimer: ReturnType<typeof setTimeout> | null = null;
+export { toast };
 
-export function toast(message: string, ms = 6000) {
-  if (toastTimer) clearTimeout(toastTimer);
-  setState({ toast: message });
-  toastTimer = setTimeout(() => {
-    toastTimer = null;
-    setState({ toast: "" });
-  }, ms);
+// ---------------------------------------------------------------------
+// 익명 이름과 쉬는 중
+// ---------------------------------------------------------------------
+
+/** 메뉴에서 이름을 다시 뽑는다 (다음 입장부터 적용) */
+export function rerollName() {
+  const { nameA, nameB } = getState();
+  let next = randomNameParts();
+  while (next[0] === nameA && next[1] === nameB) next = randomNameParts();
+  setState({ nameA: next[0], nameB: next[1] });
 }
+
+/** 일시정지했거나 다른 탭·창으로 가 있으면 다른 사람에게 "쉬는 중"으로 보인다 */
+function syncResting() {
+  const s = getState();
+  network.sendRest(s.phase === "playing" && (s.paused || document.hidden));
+}
+document.addEventListener("visibilitychange", syncResting);
+subscribe(syncResting);
 
 // ---------------------------------------------------------------------
 // 빛으로 건네는 인사

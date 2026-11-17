@@ -541,3 +541,19 @@ kbd {
     transform: translate(-50%, 0);
   }
 }
+
+/* ------------------------------------------------------------------ */
+/* 익명 이름                                                            */
+/* ------------------------------------------------------------------ */
+
+.menu__name {
+  margin: -6px 0 0;
+  color: var(--ink-faint);
+  font-size: 14px;
+  letter-spacing: 0.03em;
+}
+.menu__name strong {
+  color: var(--ink);
+  font-weight: 500;
+  margin-right: 2px;
+}

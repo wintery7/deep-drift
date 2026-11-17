@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { PUBLIC_SEA } from "../../../shared/world.ts";
-import { enterOcean, usePublicSea } from "../game/actions.ts";
+import { composeName, josa } from "../../../shared/names.ts";
+import { enterOcean, rerollName, usePublicSea } from "../game/actions.ts";
 import { VARIANTS } from "../game/runtime.ts";
 import { setState, useGame } from "../game/store.ts";
 import { fetchLiveCount } from "../net/network.ts";
@@ -37,6 +38,9 @@ function LiveCount() {
 export function Menu() {
   const variant = useGame((s) => s.variant);
   const sea = useGame((s) => s.sea);
+  const nameA = useGame((s) => s.nameA);
+  const nameB = useGame((s) => s.nameB);
+  const name = composeName(nameA, nameB);
   const invited = sea !== PUBLIC_SEA;
   const [panel, setPanel] = useState<"none" | "sound" | "guide">("none");
 
@@ -61,6 +65,14 @@ export function Menu() {
             />
           ))}
         </div>
+
+        <p className="menu__name">
+          <strong>{name}</strong>
+          {josa(name, "으로", "로")} 함께해요 ·{" "}
+          <button type="button" className="link link--inline" onClick={rerollName}>
+            다른 이름
+          </button>
+        </p>
 
         <button type="button" className="enter" onClick={enterOcean} autoFocus>
           {invited ? "초대받은 바다로 들어가기" : "심해로 들어가기"}
