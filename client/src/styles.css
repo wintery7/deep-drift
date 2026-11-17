@@ -482,3 +482,62 @@ kbd {
     transition-duration: 0.01s !important;
   }
 }
+
+/* ------------------------------------------------------------------ */
+/* 접속자 수 · 안내 문구                                                 */
+/* ------------------------------------------------------------------ */
+
+.menu__live {
+  margin: -6px 0 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--ink-faint);
+  font-size: 13px;
+  letter-spacing: 0.03em;
+}
+.menu__live-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #9aa6c4;
+}
+.menu__live-dot.is-on {
+  background: #8dffd6;
+  box-shadow: 0 0 10px #8dffd6;
+}
+.link--inline {
+  padding: 0;
+  color: var(--ink-soft);
+  border-bottom-color: var(--glass-line);
+}
+
+.toast {
+  position: fixed;
+  left: 50%;
+  bottom: 34px;
+  transform: translateX(-50%);
+  max-width: min(560px, calc(100vw - 32px));
+  padding: 11px 20px;
+  border-radius: 999px;
+  background: rgba(10, 28, 66, 0.72);
+  border: 1px solid var(--glass-line);
+  backdrop-filter: blur(12px);
+  color: var(--ink);
+  font-size: 13.5px;
+  letter-spacing: 0.02em;
+  text-align: center;
+  user-select: text;
+  animation: toast-in 0.5s ease both;
+  z-index: 10;
+}
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, 8px);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
+}

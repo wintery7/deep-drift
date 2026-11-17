@@ -1,15 +1,28 @@
-import { useMemo, useRef, useSyncExternalStore } from "react";
+import { useEffect, useMemo, useRef, useSyncExternalStore } from "react";
 import { useFrame } from "@react-three/fiber";
-import { Quaternion, Vector3, type Group } from "three";
+import {
+  AdditiveBlending,
+  BufferGeometry,
+  Color,
+  Float32BufferAttribute,
+  Quaternion,
+  ShaderMaterial,
+  Vector3,
+  type Group,
+} from "three";
 import { WORLD } from "../../../shared/world.ts";
 import { audio } from "../audio/AudioEngine.ts";
-import { lerpAngle, runtime } from "../game/runtime.ts";
+import { clamp, lerpAngle, runtime } from "../game/runtime.ts";
 import { network, type Snapshot } from "../net/network.ts";
 import { Jellyfish } from "./Jellyfish.tsx";
 import { createMotion } from "./jelly.ts";
 
 /** 수신한 상태를 이만큼 과거 시점으로 재생해 지연·끊김을 보간으로 흡수한다. */
 const INTERP_DELAY_MS = 120;
+/** 이 거리 안에서 함께 머물면 교감이 깊어진다 */
+const BOND_NEAR = 7;
+const BOND_FAR = 11;
+const THREAD_POINTS = 18;
 
 const _sample: Snapshot = { t: 0, x: 0, y: 0, z: 0, yaw: 0, lean: 0, speed: 0 };
 const _pos = new Vector3();
@@ -43,14 +56,76 @@ function sample(buffer: Snapshot[], time: number, out: Snapshot): boolean {
   return false;
 }
 
+/** 나란히 머무는 두 해파리 사이에 이어지는 빛의 실 */
+function createThread() {
+  const geometry = new BufferGeometry();
+  const t = new Float32Array(THREAD_POINTS);
+  for (let i = 0; i < THREAD_POINTS; i++) t[i] = (i + 0.5) / THREAD_POINTS;
+  geometry.setAttribute("position", new Float32BufferAttribute(new Float32Array(THREAD_POINTS * 3), 3));
+  geometry.setAttribute("aT", new Float32BufferAttribute(t, 1));
+  const material = new ShaderMaterial({
+    transparent: true,
+    depthWrite: false,
+    blending: AdditiveBlending,
+    uniforms: {
+      uOpacity: { value: 0 },
+      uTime: { value: 0 },
+      uPixelRatio: { value: 1 },
+      uColor: { value: new Color("#e2dcff") },
+    },
+    vertexShader: /* glsl */ `
+      uniform float uTime;
+      uniform float uPixelRatio;
+      attribute float aT;
+      varying float vA;
+      void main() {
+        vec4 mv = modelViewMatrix * vec4(position, 1.0);
+        float dist = max(-mv.z, 0.1);
+        // 가운데가 가장 밝고, 빛이 실을 따라 천천히 흐른다
+        vA = sin(aT * 3.14159) * (0.55 + 0.45 * sin(aT * 14.0 - uTime * 2.2));
+        gl_PointSize = clamp(34.0 * uPixelRatio / dist, 1.0, 10.0 * uPixelRatio);
+        gl_Position = projectionMatrix * mv;
+      }
+    `,
+    fragmentShader: /* glsl */ `
+      uniform vec3 uColor;
+      uniform float uOpacity;
+      varying float vA;
+      void main() {
+        float d = length(gl_PointCoord - 0.5);
+        float a = smoothstep(0.5, 0.0, d) * vA * uOpacity * 0.7;
+        gl_FragColor = vec4(uColor * a, a);
+      }
+    `,
+  });
+  return { geometry, material };
+}
+
 function RemoteJellyfish({ id }: { id: string }) {
   const group = useRef<Group>(null);
   const motion = useMemo(() => ({ ...createMotion(), opacity: 0 }), []);
-  const local = useRef({ ready: false, yaw: 0, near: false, lastChime: -100, bob: Math.random() * 10 });
+  const thread = useMemo(createThread, []);
+  const local = useRef({
+    ready: false,
+    yaw: 0,
+    near: false,
+    lastChime: -100,
+    bob: Math.random() * 10,
+    bond: 0,
+    glowSeen: -1,
+  });
   const remote = network.remotes.get(id);
   const variant = remote?.variant ?? 0;
 
-  useFrame(({ clock }, rawDt) => {
+  useEffect(
+    () => () => {
+      thread.geometry.dispose();
+      thread.material.dispose();
+    },
+    [thread],
+  );
+
+  useFrame(({ clock, gl }, rawDt) => {
     const dt = Math.min(rawDt, 0.05);
     const r = network.remotes.get(id);
     const g = group.current;
@@ -83,8 +158,52 @@ function RemoteJellyfish({ id }: { id: string }) {
     const targetOpacity = r.connected ? 1 : 0.25;
     motion.opacity += (targetOpacity - motion.opacity) * (1 - Math.exp(-2 * dt));
 
-    // 가까이 다가오면 그쪽에서 잔잔한 울림이 한 번 들린다.
+    // ---------------- 빛으로 건네는 인사 ----------------
+    if (st.glowSeen === -1) {
+      st.glowSeen = r.glow;
+    } else if (r.glow !== st.glowSeen) {
+      st.glowSeen = r.glow;
+      motion.flash = 1;
+      audio.chime(g.position);
+    }
+
+    // ---------------- 교감: 곁에 머물수록 깊어지고, 멀어지면 조용히 옅어진다 ----------------
     const d = g.position.distanceTo(runtime.pos);
+    if (d < BOND_NEAR && r.connected) st.bond = Math.min(1, st.bond + dt / 4);
+    else if (d > BOND_FAR || !r.connected) st.bond = Math.max(0, st.bond - dt / 2.5);
+    const bond = st.bond * st.bond * (3 - 2 * st.bond);
+    motion.boost = bond;
+    runtime.bondAccum = Math.max(runtime.bondAccum, bond);
+    if (bond > 0) {
+      // 내 맥동에 상대의 맥동이 서서히 맞춰진다
+      const diff = Math.atan2(Math.sin(runtime.pulse - motion.pulse), Math.cos(runtime.pulse - motion.pulse));
+      motion.pulse += diff * (1 - Math.exp(-1.6 * bond * dt));
+    }
+
+    const tu = thread.material.uniforms;
+    const threadOpacity = bond * clamp((BOND_FAR + 2 - d) / 4, 0, 1) * motion.opacity;
+    tu.uOpacity.value = threadOpacity;
+    if (threadOpacity > 0.005) {
+      tu.uTime.value = clock.elapsedTime;
+      tu.uPixelRatio.value = gl.getPixelRatio();
+      const attr = thread.geometry.attributes.position;
+      const a = runtime.pos;
+      const b = g.position;
+      for (let i = 0; i < THREAD_POINTS; i++) {
+        const k = (i + 0.5) / THREAD_POINTS;
+        const sag = Math.sin(k * Math.PI);
+        const w = clock.elapsedTime * 0.9 + k * 6 + st.bob;
+        attr.setXYZ(
+          i,
+          a.x + (b.x - a.x) * k + Math.sin(w) * 0.22 * sag,
+          a.y + (b.y - a.y) * k + 0.25 + Math.cos(w * 1.3) * 0.22 * sag - sag * 0.35,
+          a.z + (b.z - a.z) * k + Math.cos(w * 0.8) * 0.22 * sag,
+        );
+      }
+      attr.needsUpdate = true;
+    }
+
+    // 가까이 다가오면 그쪽에서 잔잔한 울림이 한 번 들린다.
     if (!st.near && d < 9) {
       st.near = true;
       if (clock.elapsedTime - st.lastChime > 20) {
@@ -97,9 +216,12 @@ function RemoteJellyfish({ id }: { id: string }) {
   });
 
   return (
-    <group ref={group} position={[0, -1000, 0]}>
-      <Jellyfish variant={variant} motion={motion} light />
-    </group>
+    <>
+      <group ref={group} position={[0, -1000, 0]}>
+        <Jellyfish variant={variant} motion={motion} light />
+      </group>
+      <points geometry={thread.geometry} material={thread.material} frustumCulled={false} renderOrder={6} />
+    </>
   );
 }
 

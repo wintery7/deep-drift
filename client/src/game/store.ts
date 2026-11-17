@@ -1,5 +1,5 @@
 import { useSyncExternalStore } from "react";
-import { WORLD } from "../../../shared/world.ts";
+import { PUBLIC_SEA, WORLD, isValidSea } from "../../../shared/world.ts";
 
 export type Phase = "menu" | "playing";
 export type NetStatus = "offline" | "connecting" | "online" | "reconnecting";
@@ -17,6 +17,10 @@ export interface GameState {
   net: NetStatus;
   /** 같은 방에 있는 다른 해파리 수 */
   others: number;
+  /** 들어갈 바다의 이름. 초대 링크(?sea=...)로 오면 그 바다, 아니면 모두의 바다 */
+  sea: string;
+  /** 화면 아래에 잠깐 떠오르는 안내 문구 */
+  toast: string;
 }
 
 const STORAGE_KEY = "deep-drift:prefs";
@@ -39,6 +43,15 @@ function loadPrefs(): Partial<GameState> {
   }
 }
 
+function seaFromUrl(): string {
+  try {
+    const v = new URLSearchParams(location.search).get("sea");
+    return isValidSea(v) ? v : PUBLIC_SEA;
+  } catch {
+    return PUBLIC_SEA;
+  }
+}
+
 let state: GameState = {
   phase: "menu",
   paused: false,
@@ -49,6 +62,8 @@ let state: GameState = {
   variant: Math.floor(Math.random() * WORLD.variants),
   net: "offline",
   others: 0,
+  sea: seaFromUrl(),
+  toast: "",
   ...loadPrefs(),
 };
 

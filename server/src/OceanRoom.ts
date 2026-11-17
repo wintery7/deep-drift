@@ -1,6 +1,6 @@
 import { Client, Room } from "colyseus";
 import { Jelly, OceanState } from "./OceanState.ts";
-import { MSG_MOVE, WORLD, terrainHeight } from "../../shared/world.ts";
+import { MSG_GLOW, MSG_MOVE, WORLD, isValidSea, terrainHeight } from "../../shared/world.ts";
 
 /** 끊긴 사용자를 방에 남겨 두는 시간(초). 새로고침·순간 단절은 이 안에 복귀한다. */
 const RECONNECT_WINDOW_S = 12;
@@ -9,6 +9,7 @@ const MSG_RATE = 40;
 
 interface ClientMeta {
   lastMoveAt: number;
+  lastGlowAt: number;
   tokens: number;
   lastRefill: number;
 }
@@ -21,10 +22,22 @@ export class OceanRoom extends Room<OceanState> {
   state = new OceanState();
   private meta = new Map<string, ClientMeta>();
 
-  onCreate() {
+  onCreate(options: unknown) {
+    // 바다 이름(초대 코드)이 올바르지 않으면 방을 만들지 않는다.
+    if (!isValidSea((options as { sea?: unknown } | null)?.sea)) throw new Error("invalid sea");
+
     this.setPatchRate(50); // 20Hz 상태 전파
 
     this.onMessage(MSG_MOVE, (client, msg: unknown) => this.handleMove(client, msg));
+    this.onMessage(MSG_GLOW, (client) => {
+      const jelly = this.state.players.get(client.sessionId);
+      const meta = this.meta.get(client.sessionId);
+      if (!jelly || !meta) return;
+      const now = Date.now();
+      if (now - meta.lastGlowAt < 1000) return; // 인사는 1초에 한 번까지
+      meta.lastGlowAt = now;
+      jelly.glow = (jelly.glow + 1) % 256;
+    });
     // 정의되지 않은 메시지는 조용히 무시한다.
     this.onMessage("*", () => {});
   }
@@ -60,7 +73,7 @@ export class OceanRoom extends Room<OceanState> {
 
     this.state.players.set(client.sessionId, jelly);
     const now = Date.now();
-    this.meta.set(client.sessionId, { lastMoveAt: now, tokens: MSG_RATE, lastRefill: now });
+    this.meta.set(client.sessionId, { lastMoveAt: now, lastGlowAt: 0, tokens: MSG_RATE, lastRefill: now });
   }
 
   async onLeave(client: Client, consented: boolean) {

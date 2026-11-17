@@ -9,7 +9,17 @@ export const runtime = {
   /** 0..1 속도 비율 */
   speed: 0,
   whalePos: new Vector3(60, 14, 0),
+  /** 내 해파리의 맥동 위상 — 곁에 머무는 해파리가 여기에 맞춰진다 */
+  pulse: 0,
+  /** true가 되면 다음 프레임에 내 해파리가 인사의 빛을 낸다 */
+  flash: false,
+  /** 곁에 머무는 해파리와의 교감 0..1 (가장 깊은 값) */
+  bond: 0,
+  bondAccum: 0,
 };
+
+/** 내 해파리의 위치를 셰이더에 전하는 공용 uniform — 지나가면 산호가 은은히 밝아진다 */
+export const playerUniform = { value: new Vector3(0, -1000, 0) };
 
 /** 모든 클라이언트가 공유하는 시계(초). 고래·물고기 떼가 모두에게 같은 자리에 보이게 한다. */
 export function worldTime(): number {

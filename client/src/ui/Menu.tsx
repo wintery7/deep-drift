@@ -1,11 +1,43 @@
-import { useState } from "react";
-import { enterOcean } from "../game/actions.ts";
+import { useEffect, useState } from "react";
+import { PUBLIC_SEA } from "../../../shared/world.ts";
+import { enterOcean, usePublicSea } from "../game/actions.ts";
 import { VARIANTS } from "../game/runtime.ts";
 import { setState, useGame } from "../game/store.ts";
+import { fetchLiveCount } from "../net/network.ts";
 import { ControlsGuide, SoundControls } from "./SoundControls.tsx";
+
+/** 지금 바다에 몇 마리가 있는지 — 누군가 있다는 것만 조용히 알려 준다 */
+function LiveCount() {
+  const [count, setCount] = useState<number | null>(null);
+
+  useEffect(() => {
+    let alive = true;
+    const load = () => {
+      void fetchLiveCount().then((n) => {
+        if (alive) setCount(n);
+      });
+    };
+    load();
+    const iv = setInterval(load, 15000);
+    return () => {
+      alive = false;
+      clearInterval(iv);
+    };
+  }, []);
+
+  if (count === null) return null;
+  return (
+    <p className="menu__live">
+      <span className={`menu__live-dot ${count > 0 ? "is-on" : ""}`} />
+      {count > 0 ? `지금 ${count}마리가 바다에 있어요` : "지금은 고요한 바다예요"}
+    </p>
+  );
+}
 
 export function Menu() {
   const variant = useGame((s) => s.variant);
+  const sea = useGame((s) => s.sea);
+  const invited = sea !== PUBLIC_SEA;
   const [panel, setPanel] = useState<"none" | "sound" | "guide">("none");
 
   return (
@@ -31,8 +63,19 @@ export function Menu() {
         </div>
 
         <button type="button" className="enter" onClick={enterOcean} autoFocus>
-          심해로 들어가기
+          {invited ? "초대받은 바다로 들어가기" : "심해로 들어가기"}
         </button>
+
+        {invited ? (
+          <p className="menu__live">
+            초대 링크로 연결된 바다예요 ·{" "}
+            <button type="button" className="link link--inline" onClick={usePublicSea}>
+              모두의 바다로 가기
+            </button>
+          </p>
+        ) : (
+          <LiveCount />
+        )}
 
         <div className="menu__links">
           <button type="button" className={`link ${panel === "sound" ? "is-active" : ""}`} onClick={() => setPanel(panel === "sound" ? "none" : "sound")}>

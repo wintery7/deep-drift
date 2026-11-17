@@ -35,6 +35,14 @@ export function terrainHeight(x: number, z: number): number {
 }
 
 export const MSG_MOVE = "move";
+/** 빛으로 건네는 인사 */
+export const MSG_GLOW = "glow";
+
+/** 누구나 들어오는 기본 바다. 초대 링크는 별도의 이름을 가진 바다로 이어진다. */
+export const PUBLIC_SEA = "public";
+export function isValidSea(v: unknown): v is string {
+  return typeof v === "string" && /^[a-z0-9]{4,16}$/.test(v);
+}
 
 export interface MoveMessage {
   x: number;

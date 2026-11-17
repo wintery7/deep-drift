@@ -21,6 +21,10 @@ export interface JellyMotion {
   /** 해파리 로컬 좌표계에서의 속도 (최대 속도로 정규화) — 촉수가 뒤로 끌리는 방향 */
   velLocal: Vector3;
   opacity: number;
+  /** 인사의 빛 1 → 0 */
+  flash: number;
+  /** 곁에 누군가 머물 때 은은히 밝아지는 정도 0..1 */
+  boost: number;
 }
 
 export const createMotion = (): JellyMotion => ({
@@ -28,6 +32,8 @@ export const createMotion = (): JellyMotion => ({
   speed: 0,
   velLocal: new Vector3(),
   opacity: 1,
+  flash: 0,
+  boost: 0,
 });
 
 // ---------------------------------------------------------------------
@@ -98,6 +104,8 @@ const COMMON_FRAG = /* glsl */ `
   uniform vec3 uFogColor;
   uniform float uFogDensity;
   uniform float uOpacity;
+  uniform float uFlash;
+  uniform float uBoost;
   varying vec3 vColor;
   varying vec3 vGlow;
   varying float vDepth;
@@ -167,7 +175,9 @@ const BELL_FRAG = /* glsl */ `
     // 정수리 안쪽에서 비치는 빛
     col += vGlow * (1.0 - smoothstep(0.0, 0.5, vT)) * 0.22;
 
-    float alpha = 0.2 + 0.6 * fres + 0.3 * rim;
+    col *= 1.0 + uBoost * 0.35;
+    col += vGlow * uFlash * 0.5;
+    float alpha = 0.2 + 0.6 * fres + 0.3 * rim + uFlash * 0.25;
     float fog = fogFactor();
     col = mix(col, uFogColor, fog);
     alpha *= (1.0 - fog * 0.65) * uOpacity;
@@ -217,6 +227,7 @@ const TENTACLE_FRAG = /* glsl */ `
     // 촉수를 따라 흘러내리는 빛
     float band = pow(0.5 + 0.5 * sin(vAT * 9.0 - uTime * 1.8 + vPh), 5.0);
     col *= 0.55 + 0.9 * band;
+    col *= 1.0 + uBoost * 0.45 + uFlash * 1.0;
     float alpha = pow(clamp(1.0 - vAT, 0.0, 1.0), 0.8) * 0.55 * uOpacity;
     float fog = fogFactor();
     gl_FragColor = vec4(col * (1.0 - fog), alpha * (1.0 - fog));
@@ -229,6 +240,8 @@ function baseUniforms() {
     uSpeed: { value: 0 },
     uTime: { value: 0 },
     uOpacity: { value: 1 },
+    uFlash: { value: 0 },
+    uBoost: { value: 0 },
     uColor: { value: new Color("#8a66ff") },
     uGlow: { value: new Color("#dccdff") },
     uVelLocal: { value: new Vector3() },

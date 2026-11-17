@@ -23,7 +23,7 @@ import {
 import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js";
 import { terrainHeight } from "../../../shared/world.ts";
 import { audio } from "../audio/AudioEngine.ts";
-import { FOG_COLOR, FOG_DENSITY, mulberry32, runtime, worldTime } from "../game/runtime.ts";
+import { FOG_COLOR, FOG_DENSITY, mulberry32, playerUniform, runtime, worldTime } from "../game/runtime.ts";
 import { CAVE, caveSolid } from "./cave.ts";
 import { bellGeometry, createJellyMaterials, tentacleGeometry } from "./jelly.ts";
 
@@ -40,12 +40,15 @@ export function createGlowMaterial(opts: { base: number; tip: number; sway: numb
       uBase: { value: opts.base },
       uTip: { value: opts.tip },
       uSway: { value: opts.sway },
+      uPlayer: playerUniform,
       uFogColor: { value: new Color(FOG_COLOR) },
       uFogDensity: { value: FOG_DENSITY },
     },
     vertexShader: /* glsl */ `
       uniform float uTime;
       uniform float uSway;
+      uniform vec3 uPlayer;
+      varying float vNear;
       varying vec3 vColor;
       varying float vH;
       varying float vDepth;
@@ -55,6 +58,8 @@ export function createGlowMaterial(opts: { base: number; tip: number; sway: numb
         vH = clamp(position.y, 0.0, 1.0);
         mat4 m = modelMatrix * instanceMatrix;
         vec4 wp = m * vec4(position, 1.0);
+        // 해파리가 지나가면 은은히 밝아진다
+        vNear = 1.0 - smoothstep(2.5, 10.0, distance(wp.xyz, uPlayer));
         float seed = instanceMatrix[3].x * 0.37 + instanceMatrix[3].z * 0.71;
         wp.x += sin(uTime * 0.8 + seed + wp.y * 0.3) * uSway * vH * vH;
         wp.z += cos(uTime * 0.6 + seed * 1.3) * uSway * vH * vH * 0.6;
@@ -78,10 +83,12 @@ export function createGlowMaterial(opts: { base: number; tip: number; sway: numb
       varying float vDepth;
       varying float vSeed;
       varying float vFacing;
+      varying float vNear;
       void main() {
         float pulse = 0.78 + 0.22 * sin(uTime * 0.7 + vSeed * 5.0);
         vec3 col = vColor * (uBase + uTip * pow(clamp(vH, 0.0, 1.0), 1.6)) * pulse;
         col *= 0.75 + 0.25 * vFacing;
+        col *= 1.0 + 0.8 * vNear;
         col += vColor * pow(clamp(1.0 - vFacing, 0.0, 1.0), 2.0) * 0.25 * vH;
         float fog = 1.0 - exp(-uFogDensity * uFogDensity * vDepth * vDepth);
         gl_FragColor = vec4(mix(col, uFogColor, fog), 1.0);
@@ -316,6 +323,17 @@ function FishSchool({ seed, count, radius, height, color }: { seed: number; coun
       _p0.x += f.ox + wob * 0.25;
       _p0.y += f.oy + Math.cos(ft * 0.9 + f.phase) * 0.2;
       _p0.z += f.oz;
+      // 해파리가 다가오면 살짝 비켜 간다
+      const ax = _p0.x - runtime.pos.x;
+      const ay = _p0.y - runtime.pos.y;
+      const az = _p0.z - runtime.pos.z;
+      const ad = Math.hypot(ax, ay, az);
+      if (ad < 5 && ad > 1e-3) {
+        const push = ((5 - ad) / 5) ** 2 * 3.2;
+        _p0.x += (ax / ad) * push;
+        _p0.y += (ay / ad) * push;
+        _p0.z += (az / ad) * push;
+      }
       _p1.x += f.ox;
       _p1.y += f.oy;
       _p1.z += f.oz;

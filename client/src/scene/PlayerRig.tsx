@@ -4,7 +4,7 @@ import { Quaternion, Vector3, type Group } from "three";
 import { WORLD, terrainHeight } from "../../../shared/world.ts";
 import { audio } from "../audio/AudioEngine.ts";
 import { readInput } from "../game/input.ts";
-import { clamp, lerpAngle, runtime } from "../game/runtime.ts";
+import { clamp, lerpAngle, playerUniform, runtime } from "../game/runtime.ts";
 import { getState, useGame } from "../game/store.ts";
 import { network } from "../net/network.ts";
 import { CAVE, caveInsideness, caveResolve, caveSolid } from "./cave.ts";
@@ -88,6 +88,15 @@ export function PlayerRig() {
     const c = cam.current;
     const { pos, vel } = runtime;
 
+    // 교감과 인사 — 곁에 누가 머물면 은은히 밝아지고, 인사하면 빛이 퍼진다
+    runtime.bond = runtime.bondAccum;
+    runtime.bondAccum = 0;
+    motion.boost += (runtime.bond - motion.boost) * damp(2, dt);
+    if (runtime.flash) {
+      runtime.flash = false;
+      motion.flash = 1;
+    }
+
     // ---------------- 입력 ----------------
     const input = playing && !s.paused ? readInput() : { forward: 0, strafe: 0, vertical: 0 };
     const sinY = Math.sin(c.yaw);
@@ -104,6 +113,7 @@ export function PlayerRig() {
     // ---------------- 맥동과 추진 ----------------
     const prevPulse = motion.pulse;
     motion.pulse += dt * (1.4 + 2.2 * inputMag);
+    runtime.pulse = motion.pulse;
     // 우산을 오므리는 순간에 조금 더 힘차게 나아간다.
     const surge = 0.78 + 0.34 * Math.max(0, Math.sin(motion.pulse));
     _target.copy(_wish).multiplyScalar(WORLD.maxSpeed * inputMag * surge);
@@ -154,6 +164,8 @@ export function PlayerRig() {
       lastEnclosure.current = enclosure;
       audio.setEnclosure(enclosure);
     }
+
+    playerUniform.value.copy(pos);
 
     // ---------------- 자세 ----------------
     const hSpeed = Math.hypot(vel.x, vel.z);

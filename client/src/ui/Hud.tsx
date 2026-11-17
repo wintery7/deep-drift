@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { exitOcean, setPaused } from "../game/actions.ts";
+import { exitOcean, glow, invite, setPaused, toast } from "../game/actions.ts";
 import { setState, useGame } from "../game/store.ts";
 import { ControlsGuide, SoundControls } from "./SoundControls.tsx";
 
@@ -33,6 +33,12 @@ export function Hud() {
     return () => clearTimeout(t);
   }, []);
 
+  // 쉬러 온 곳이니, 10분이 지나면 한 번만 조용히 알려 준다.
+  useEffect(() => {
+    const t = setTimeout(() => toast("10분이 지났어요. 충분히 쉬었다면 돌아가도 좋아요.", 9000), 10 * 60 * 1000);
+    return () => clearTimeout(t);
+  }, []);
+
   return (
     <>
       <div className="hud">
@@ -51,6 +57,12 @@ export function Hud() {
           </label>
           <button type="button" className="chip" onClick={() => setState({ muted: !muted })} aria-pressed={muted}>
             {muted ? "소리 켜기" : "소리 끄기"}
+          </button>
+          <button type="button" className="chip" onClick={glow} title="빛으로 인사 (E)">
+            인사
+          </button>
+          <button type="button" className="chip" onClick={() => void invite()} title="같은 바다에서 만날 수 있는 링크를 복사합니다">
+            초대
           </button>
           <button type="button" className="chip" onClick={() => setPaused(true)}>
             설정

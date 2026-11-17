@@ -9,6 +9,8 @@ export class Jelly extends Schema {
   @type("float32") speed = 0;
   @type("uint8") variant = 0;
   @type("boolean") connected = true;
+  /** 인사할 때마다 1씩 늘어난다 (값이 바뀌면 다른 클라이언트가 빛을 재생) */
+  @type("uint8") glow = 0;
 }
 
 export class OceanState extends Schema {

@@ -1,5 +1,5 @@
 import { Client, type Room } from "colyseus.js";
-import { MSG_MOVE, type MoveMessage } from "../../../shared/world.ts";
+import { MSG_GLOW, MSG_MOVE, PUBLIC_SEA, type MoveMessage } from "../../../shared/world.ts";
 import { runtime } from "../game/runtime.ts";
 import { setState } from "../game/store.ts";
 
@@ -17,6 +17,8 @@ export interface RemoteJelly {
   id: string;
   variant: number;
   connected: boolean;
+  /** 인사 횟수 카운터 — 값이 바뀌면 빛을 재생한다 */
+  glow: number;
   buffer: Snapshot[];
 }
 
@@ -29,6 +31,7 @@ interface JellyLike {
   speed: number;
   variant: number;
   connected: boolean;
+  glow?: number;
 }
 interface OceanStateLike {
   players: { forEach(cb: (p: JellyLike, id: string) => void): void };
@@ -57,6 +60,7 @@ class Network {
   private joining = false;
   private spawned = false;
   private variant = 0;
+  private sea: string = PUBLIC_SEA;
   private retryTimer: ReturnType<typeof setTimeout> | null = null;
   private listeners = new Set<() => void>();
 
@@ -72,8 +76,9 @@ class Network {
     return this.room !== null;
   }
 
-  connect(variant: number) {
+  connect(variant: number, sea: string = PUBLIC_SEA) {
     this.variant = variant;
+    this.sea = sea;
     this.wantOnline = true;
     this.spawned = false;
     void this.tryJoin();
@@ -98,6 +103,15 @@ class Network {
     setState({ net: "offline" });
   }
 
+  sendGlow() {
+    if (!this.room) return;
+    try {
+      this.room.send(MSG_GLOW);
+    } catch {
+      /* noop */
+    }
+  }
+
   sendMove(msg: MoveMessage) {
     if (!this.room) return;
     try {
@@ -119,7 +133,11 @@ class Network {
       // 새로고침·순간 단절이면 같은 자리로 복귀를 먼저 시도한다.
       let token: string | null = null;
       try {
-        token = sessionStorage.getItem(TOKEN_KEY);
+        // 토큰은 "바다 이름|토큰"으로 저장된다. 다른 바다의 토큰으로는 돌아가지 않는다.
+        const saved = sessionStorage.getItem(TOKEN_KEY);
+        const cut = saved ? saved.indexOf("|") : -1;
+        if (saved && cut > 0 && saved.slice(0, cut) === this.sea) token = saved.slice(cut + 1);
+        else if (saved) sessionStorage.removeItem(TOKEN_KEY);
       } catch {
         /* noop */
       }
@@ -134,7 +152,7 @@ class Network {
           }
         }
       }
-      room ??= await this.client.joinOrCreate<OceanStateLike>("ocean", { variant: this.variant });
+      room ??= await this.client.joinOrCreate<OceanStateLike>("ocean", { variant: this.variant, sea: this.sea });
 
       if (!this.wantOnline) {
         void room.leave(true).catch(() => {});
@@ -152,7 +170,7 @@ class Network {
   private attach(room: Room<OceanStateLike>) {
     this.room = room;
     try {
-      sessionStorage.setItem(TOKEN_KEY, room.reconnectionToken);
+      sessionStorage.setItem(TOKEN_KEY, `${this.sea}|${room.reconnectionToken}`);
     } catch {
       /* noop */
     }
@@ -199,12 +217,13 @@ class Network {
       seen.add(id);
       let r = this.remotes.get(id);
       if (!r) {
-        r = { id, variant: p.variant, connected: p.connected, buffer: [] };
+        r = { id, variant: p.variant, connected: p.connected, glow: p.glow ?? 0, buffer: [] };
         this.remotes.set(id, r);
         changed = true;
       }
       r.variant = p.variant;
       r.connected = p.connected;
+      r.glow = p.glow ?? 0;
       r.buffer.push({ t: now, x: p.x, y: p.y, z: p.z, yaw: p.yaw, lean: p.lean, speed: p.speed });
       if (r.buffer.length > MAX_BUFFER) r.buffer.shift();
     });
@@ -232,3 +251,15 @@ class Network {
 }
 
 export const network = new Network();
+
+/** 지금 서버 전체에 몇 마리가 있는지 (메뉴 표시용). 실패하면 null. */
+export async function fetchLiveCount(): Promise<number | null> {
+  try {
+    const res = await fetch(endpoint().replace(/^ws/, "http") + "/stats", { cache: "no-store" });
+    if (!res.ok) return null;
+    const data = (await res.json()) as { jellies?: unknown };
+    return typeof data.jellies === "number" ? data.jellies : null;
+  } catch {
+    return null;
+  }
+}
