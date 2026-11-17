@@ -162,6 +162,100 @@ class AudioEngine {
     panner.connect(this.sfxReverb);
   }
 
+  /** 노래하는 산호 — 유리 같은 맑은 음. 위치에서 들린다. */
+  note(freq: number, pos: Vector3, strength = 1) {
+    const ctx = this.ctx;
+    if (!ctx || !this.active || ctx.state !== "running") return;
+    const now = ctx.currentTime;
+    const panner = this.makePanner(pos.x, pos.y, pos.z, 8, 1);
+    panner.connect(this.sfx);
+    panner.connect(this.sfxReverb);
+    [
+      { mult: 1, gain: 0.11, type: "sine" as const, decay: 2.6 },
+      { mult: 2, gain: 0.035, type: "sine" as const, decay: 1.2 },
+      { mult: 3.01, gain: 0.015, type: "triangle" as const, decay: 0.6 },
+    ].forEach(({ mult, gain, type, decay }) => {
+      const osc = ctx.createOscillator();
+      osc.type = type;
+      osc.frequency.value = freq * mult;
+      const g = ctx.createGain();
+      g.gain.setValueAtTime(0, now);
+      g.gain.linearRampToValueAtTime(gain * strength, now + 0.012);
+      g.gain.exponentialRampToValueAtTime(0.0001, now + decay);
+      osc.connect(g).connect(panner);
+      osc.start(now);
+      osc.stop(now + decay + 0.05);
+    });
+  }
+
+  /** 잠든 빛이 뒤척일 때 — 아주 낮고 긴 숨 */
+  stir(pos: Vector3) {
+    const ctx = this.ctx;
+    if (!ctx || !this.active || ctx.state !== "running") return;
+    const now = ctx.currentTime;
+    const panner = this.makePanner(pos.x, pos.y, pos.z, 18, 0.8);
+    panner.connect(this.ambient);
+    panner.connect(this.ambientReverb);
+    [73.42, 110.0].forEach((f, i) => {
+      const osc = ctx.createOscillator();
+      osc.type = "sine";
+      osc.frequency.setValueAtTime(f * 0.97, now);
+      osc.frequency.linearRampToValueAtTime(f, now + 1.6);
+      const g = ctx.createGain();
+      g.gain.setValueAtTime(0, now);
+      g.gain.linearRampToValueAtTime(i === 0 ? 0.32 : 0.16, now + 1.2);
+      g.gain.linearRampToValueAtTime(0, now + 4.5);
+      osc.connect(g).connect(panner);
+      osc.start(now);
+      osc.stop(now + 4.6);
+    });
+  }
+
+  /** 잠든 빛이 깨어날 때 — 바다 전체에 퍼지는 따뜻한 화음 */
+  awaken() {
+    const ctx = this.ctx;
+    if (!ctx || !this.active || ctx.state !== "running") return;
+    const now = ctx.currentTime;
+    const chord = [146.83, 220.0, 293.66, 349.23, 440.0, 587.33];
+    chord.forEach((f, i) => {
+      const start = now + i * 0.35;
+      const osc = ctx.createOscillator();
+      osc.type = i % 2 ? "triangle" : "sine";
+      osc.frequency.value = f;
+      osc.detune.value = (i % 3 - 1) * 4;
+      const lp = ctx.createBiquadFilter();
+      lp.type = "lowpass";
+      lp.frequency.value = 1400;
+      const g = ctx.createGain();
+      const peak = 0.06 - i * 0.006;
+      g.gain.setValueAtTime(0, start);
+      g.gain.linearRampToValueAtTime(peak, start + 2.5);
+      g.gain.setValueAtTime(peak, start + 6);
+      g.gain.linearRampToValueAtTime(0, start + 12);
+      osc.connect(lp).connect(g);
+      g.connect(this.ambient);
+      g.connect(this.ambientReverb);
+      osc.start(start);
+      osc.stop(start + 12.2);
+    });
+    // 위로 흩어지는 반짝임
+    for (let k = 0; k < 9; k++) {
+      const t = now + 1 + k * 0.45 + Math.random() * 0.2;
+      const osc = ctx.createOscillator();
+      osc.type = "sine";
+      osc.frequency.value = pick(CHIME_NOTES) * (k > 5 ? 2 : 1);
+      const g = ctx.createGain();
+      g.gain.setValueAtTime(0, t);
+      g.gain.linearRampToValueAtTime(0.04, t + 0.02);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + 2.4);
+      osc.connect(g);
+      g.connect(this.sfx);
+      g.connect(this.sfxReverb);
+      osc.start(t);
+      osc.stop(t + 2.5);
+    }
+  }
+
   private lastSparkle = 0;
 
   /** 빛 플랑크톤을 머금을 때의 아주 작은 반짝임 */

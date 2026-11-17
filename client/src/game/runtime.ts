@@ -13,6 +13,8 @@ export const runtime = {
   pulse: 0,
   /** true가 되면 다음 프레임에 내 해파리가 인사의 빛을 낸다 */
   flash: false,
+  /** 내가 인사한 횟수 */
+  glows: 0,
   /** 곁에 머무는 해파리와의 교감 0..1 (가장 깊은 값) */
   bond: 0,
   bondAccum: 0,

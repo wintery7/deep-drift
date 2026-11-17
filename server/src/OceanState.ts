@@ -21,4 +21,12 @@ export class Jelly extends Schema {
 
 export class OceanState extends Schema {
   @type({ map: Jelly }) players = new MapSchema<Jelly>();
+  /** 잠든 빛이 깨어 있는가 */
+  @type("boolean") sleeperAwake = false;
+  /** 혼자 건넨 인사에 뒤척인 횟수 (값이 바뀌면 클라이언트가 뒤척임을 재생) */
+  @type("uint16") sleeperStirs = 0;
+  /** 깨어난 횟수 */
+  @type("uint16") sleeperWakes = 0;
+  /** 마지막으로 깨어난 까닭 (WAKE_TOGETHER / WAKE_SELF) */
+  @type("uint8") sleeperWakeKind = 0;
 }

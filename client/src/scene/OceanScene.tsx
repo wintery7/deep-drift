@@ -4,6 +4,8 @@ import { Cave } from "./Cave.tsx";
 import { Environment } from "./Environment.tsx";
 import { Life } from "./Life.tsx";
 import { Plankton } from "./Plankton.tsx";
+import { SingingCoral } from "./SingingCoral.tsx";
+import { Sleeper } from "./Sleeper.tsx";
 import { PlayerRig } from "./PlayerRig.tsx";
 import { RemotePlayers } from "./RemotePlayers.tsx";
 
@@ -24,6 +26,8 @@ export function OceanScene() {
       <Life />
       <Cave />
       <Plankton />
+      <Sleeper />
+      <SingingCoral />
       <PlayerRig />
       <RemotePlayers />
       <EffectComposer multisampling={4}>

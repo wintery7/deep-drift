@@ -51,12 +51,16 @@ export const bellGeometry: BufferGeometry = (() => {
 })();
 
 /** 촉수: 가장자리의 가는 촉수 + 가운데의 굵은 구완. aT = 뿌리(0)→끝(1) */
-export const tentacleGeometry: BufferGeometry = (() => {
+/**
+ * 촉수 묶음. radial: 단면의 각 수 (크게 키울 것이라면 둥글게),
+ * rim: 가장자리 촉수 수, armThick: 가운데 굵은 구완의 굵기 배율.
+ */
+export function createTentacleGeometry(radial = 4, rim = 12, armThick = 1): BufferGeometry {
   const rng = mulberry32(7);
   const parts: BufferGeometry[] = [];
 
   const add = (angle: number, radius: number, length: number, thick: number, baseY: number) => {
-    const g = new CylinderGeometry(thick, thick * 0.12, length, 4, 16, true);
+    const g = new CylinderGeometry(thick, thick * 0.12, length, radial, 16, true);
     g.translate(0, -length / 2, 0);
     const pos = g.attributes.position;
     const aT = new Float32Array(pos.count);
@@ -72,19 +76,20 @@ export const tentacleGeometry: BufferGeometry = (() => {
     parts.push(g);
   };
 
-  const RIM = 12;
-  for (let i = 0; i < RIM; i++) {
-    add((i / RIM) * Math.PI * 2 + rng() * 0.2, 0.88, 2.3 + rng() * 1.5, 0.03, -0.1);
+  for (let i = 0; i < rim; i++) {
+    add((i / rim) * Math.PI * 2 + rng() * 0.2, 0.88, 2.3 + rng() * 1.5, 0.03, -0.1);
   }
   const ARMS = 5;
   for (let i = 0; i < ARMS; i++) {
-    add((i / ARMS) * Math.PI * 2 + 0.3, 0.2, 1.5 + rng() * 0.7, 0.1, 0.05);
+    add((i / ARMS) * Math.PI * 2 + 0.3, 0.2, 1.5 + rng() * 0.7, 0.1 * armThick, 0.05);
   }
 
   const merged = mergeGeometries(parts);
   parts.forEach((p) => p.dispose());
   return merged!;
-})();
+}
+
+export const tentacleGeometry: BufferGeometry = createTentacleGeometry();
 
 // ---------------------------------------------------------------------
 // Shaders

@@ -1,5 +1,5 @@
 import { Client, type Room } from "colyseus.js";
-import { MSG_GLOW, MSG_MOVE, MSG_REST, PUBLIC_SEA, type MoveMessage } from "../../../shared/world.ts";
+import { MSG_GLOW, MSG_MOVE, MSG_NOTE, MSG_REST, PUBLIC_SEA, type MoveMessage } from "../../../shared/world.ts";
 import { josa } from "../../../shared/names.ts";
 import { runtime } from "../game/runtime.ts";
 import { getState, setState } from "../game/store.ts";
@@ -45,6 +45,32 @@ interface JellyLike {
 }
 interface OceanStateLike {
   players: { forEach(cb: (p: JellyLike, id: string) => void): void };
+  sleeperAwake?: boolean;
+  sleeperStirs?: number;
+  sleeperWakes?: number;
+  sleeperWakeKind?: number;
+}
+
+/**
+ * 바다 전체에 일어나는 일 — 장면이 매 프레임 읽는다.
+ * synced가 false인 첫 상태에서는 이미 일어난 일로 보고 연출을 건너뛴다.
+ */
+export const ocean = {
+  synced: false,
+  sleeperAwake: false,
+  sleeperStirs: 0,
+  sleeperWakes: 0,
+  sleeperWakeKind: 0,
+};
+
+type NoteListener = (i: number) => void;
+const noteListeners = new Set<NoteListener>();
+/** 다른 사람이 노래하는 산호를 울렸을 때 */
+export function onRemoteNote(l: NoteListener) {
+  noteListeners.add(l);
+  return () => {
+    noteListeners.delete(l);
+  };
 }
 
 const TOKEN_KEY = "deep-drift:reconnect";
@@ -123,6 +149,15 @@ class Network {
     if (!this.room) return;
     try {
       this.room.send(MSG_REST, resting);
+    } catch {
+      /* noop */
+    }
+  }
+
+  sendNote(i: number) {
+    if (!this.room) return;
+    try {
+      this.room.send(MSG_NOTE, { i });
     } catch {
       /* noop */
     }
@@ -216,7 +251,12 @@ class Network {
       }
     }
 
+    ocean.synced = false;
     room.onStateChange((state) => this.sync(room, state));
+    room.onMessage(MSG_NOTE, (msg: { i?: unknown } | null) => {
+      const i = msg?.i;
+      if (typeof i === "number" && Number.isInteger(i)) noteListeners.forEach((l) => l(i));
+    });
     room.onError(() => {});
     room.onLeave(() => {
       if (this.room !== room) return;
@@ -289,6 +329,11 @@ class Network {
         changed = true;
       }
     }
+    ocean.sleeperAwake = state.sleeperAwake ?? false;
+    ocean.sleeperStirs = state.sleeperStirs ?? 0;
+    ocean.sleeperWakes = state.sleeperWakes ?? 0;
+    ocean.sleeperWakeKind = state.sleeperWakeKind ?? 0;
+    ocean.synced = true;
     this.initialSync = false;
     if (changed) this.emit();
   }

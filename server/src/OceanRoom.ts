@@ -1,6 +1,18 @@
 import { Client, Room } from "colyseus";
 import { Jelly, OceanState } from "./OceanState.ts";
-import { MSG_GLOW, MSG_MOVE, MSG_REST, WORLD, isValidSea, terrainHeight } from "../../shared/world.ts";
+import {
+  MSG_GLOW,
+  MSG_MOVE,
+  MSG_NOTE,
+  MSG_REST,
+  SLEEPER,
+  SONG_PIPES,
+  WAKE_SELF,
+  WAKE_TOGETHER,
+  WORLD,
+  isValidSea,
+  terrainHeight,
+} from "../../shared/world.ts";
 import { NAME_FIRST, NAME_SECOND, composeName, isValidNamePart, randomNameParts } from "../../shared/names.ts";
 
 /** 끊긴 사용자를 방에 남겨 두는 시간(초). 새로고침·순간 단절은 이 안에 복귀한다. */
@@ -11,6 +23,10 @@ const MSG_RATE = 40;
 interface ClientMeta {
   lastMoveAt: number;
   lastGlowAt: number;
+  /** 잠든 빛 곁에서 마지막으로 인사한 시각 */
+  sleeperGlowAt: number;
+  noteTokens: number;
+  noteRefill: number;
   tokens: number;
   lastRefill: number;
 }
@@ -29,6 +45,11 @@ export class OceanRoom extends Room<OceanState> {
 
     this.setPatchRate(50); // 20Hz 상태 전파
 
+    // 잠든 빛은 몇 분에 한 번 스스로 잠시 눈을 뜬다 — 혼자 온 사람도 볼 수 있도록
+    this.clock.setInterval(() => {
+      if (this.state.players.size > 0) this.wakeSleeper(WAKE_SELF, SLEEPER.selfWakeSeconds);
+    }, SLEEPER.selfWakeEverySeconds * 1000);
+
     this.onMessage(MSG_MOVE, (client, msg: unknown) => this.handleMove(client, msg));
     this.onMessage(MSG_GLOW, (client) => {
       const jelly = this.state.players.get(client.sessionId);
@@ -38,6 +59,22 @@ export class OceanRoom extends Room<OceanState> {
       if (now - meta.lastGlowAt < 1000) return; // 인사는 1초에 한 번까지
       meta.lastGlowAt = now;
       jelly.glow = (jelly.glow + 1) % 256;
+      if (Math.hypot(jelly.x - SLEEPER.x, jelly.z - SLEEPER.z) < SLEEPER.reach) {
+        meta.sleeperGlowAt = now;
+        this.touchSleeper(now);
+      }
+    });
+    // 노래하는 산호: 울린 관 번호를 다른 사람에게 전한다 (초당 8번까지)
+    this.onMessage(MSG_NOTE, (client, msg: unknown) => {
+      const meta = this.meta.get(client.sessionId);
+      const i = (msg as { i?: unknown } | null)?.i;
+      if (!meta || !isNum(i) || !Number.isInteger(i) || i < 0 || i >= SONG_PIPES) return;
+      const now = Date.now();
+      meta.noteTokens = Math.min(8, meta.noteTokens + ((now - meta.noteRefill) / 1000) * 8);
+      meta.noteRefill = now;
+      if (meta.noteTokens < 1) return;
+      meta.noteTokens -= 1;
+      this.broadcast(MSG_NOTE, { i }, { except: client });
     });
     // 정의되지 않은 메시지는 조용히 무시한다.
     this.onMessage(MSG_REST, (client, msg: unknown) => {
@@ -89,7 +126,7 @@ export class OceanRoom extends Room<OceanState> {
 
     this.state.players.set(client.sessionId, jelly);
     const now = Date.now();
-    this.meta.set(client.sessionId, { lastMoveAt: now, lastGlowAt: 0, tokens: MSG_RATE, lastRefill: now });
+    this.meta.set(client.sessionId, { lastMoveAt: now, lastGlowAt: 0, sleeperGlowAt: 0, noteTokens: 8, noteRefill: now, tokens: MSG_RATE, lastRefill: now });
   }
 
   async onLeave(client: Client, consented: boolean) {
@@ -112,6 +149,37 @@ export class OceanRoom extends Room<OceanState> {
 
     this.state.players.delete(client.sessionId);
     this.meta.delete(client.sessionId);
+  }
+
+  /** 잠든 빛 곁에서 인사가 건네졌다. 최근에 함께 인사한 사람이 둘 이상이면 깨어난다. */
+  private touchSleeper(now: number) {
+    if (this.state.sleeperAwake) return;
+    let together = 0;
+    this.meta.forEach((m, id) => {
+      const j = this.state.players.get(id);
+      if (j?.connected && now - m.sleeperGlowAt < SLEEPER.togetherWindowMs) together++;
+    });
+    if (together < 2) {
+      this.state.sleeperStirs = (this.state.sleeperStirs + 1) % 65536;
+      return;
+    }
+    // 함께 깨운 인사는 한 번만 쓰인다
+    this.meta.forEach((m) => (m.sleeperGlowAt = 0));
+    this.wakeSleeper(WAKE_TOGETHER, SLEEPER.awakeSeconds);
+  }
+
+  private sleepTimer: { clear(): void } | null = null;
+
+  private wakeSleeper(kind: number, seconds: number) {
+    if (this.state.sleeperAwake) return;
+    this.state.sleeperAwake = true;
+    this.state.sleeperWakeKind = kind;
+    this.state.sleeperWakes = (this.state.sleeperWakes + 1) % 65536;
+    this.sleepTimer?.clear();
+    this.sleepTimer = this.clock.setTimeout(() => {
+      this.state.sleeperAwake = false;
+      this.sleepTimer = null;
+    }, seconds * 1000);
   }
 
   private handleMove(client: Client, msg: unknown) {

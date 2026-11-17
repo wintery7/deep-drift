@@ -70,6 +70,7 @@ export function glow() {
   if (now - lastGlow < 1200) return;
   lastGlow = now;
   runtime.flash = true;
+  runtime.glows++;
   network.sendGlow();
   audio.chime(runtime.pos);
 }

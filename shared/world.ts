@@ -39,6 +39,33 @@ export const MSG_MOVE = "move";
 export const MSG_GLOW = "glow";
 /** 쉬는 중인지 (일시정지·다른 탭) — true/false */
 export const MSG_REST = "rest";
+/** 노래하는 산호를 울렸다 — { i: 관 번호 } */
+export const MSG_NOTE = "note";
+
+/**
+ * 깊은 곳에 잠든 거대한 빛. 두 명 이상이 곁에서 함께 빛으로 인사하면 깨어난다.
+ * reach: 이 수평 거리 안에서 건넨 인사만 닿는다.
+ */
+export const SLEEPER = {
+  x: 40,
+  z: 30,
+  reach: 20,
+  /** 함께 깨웠을 때 깨어 있는 시간 */
+  awakeSeconds: 60,
+  togetherWindowMs: 8000,
+  /** 혼자 있어도 볼 수 있도록 스스로 잠시 눈을 뜨는 간격과 시간 */
+  selfWakeEverySeconds: 360,
+  selfWakeSeconds: 30,
+} as const;
+
+/** 깨어난 까닭 — 1: 함께 인사해서, 2: 스스로 */
+export const WAKE_TOGETHER = 1;
+export const WAKE_SELF = 2;
+
+/** 노래하는 산호: 무리 수 × 무리당 관 수 */
+export const SONG_CHOIRS = 5;
+export const SONG_PIPES_PER_CHOIR = 6;
+export const SONG_PIPES = SONG_CHOIRS * SONG_PIPES_PER_CHOIR;
 
 /** 누구나 들어오는 기본 바다. 초대 링크는 별도의 이름을 가진 바다로 이어진다. */
 export const PUBLIC_SEA = "public";
