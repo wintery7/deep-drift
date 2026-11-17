@@ -1,5 +1,6 @@
 import { useSyncExternalStore } from "react";
 import { PUBLIC_SEA, WORLD, isValidSea } from "../../../shared/world.ts";
+import { NAME_FIRST, NAME_SECOND, isValidNamePart, randomNameParts } from "../../../shared/names.ts";
 
 export type Phase = "menu" | "playing";
 export type NetStatus = "offline" | "connecting" | "online" | "reconnecting";
@@ -14,6 +15,9 @@ export interface GameState {
   muted: boolean;
   /** 해파리 외형 */
   variant: number;
+  /** 익명 이름 (단어 두 개의 번호) */
+  nameA: number;
+  nameB: number;
   net: NetStatus;
   /** 같은 방에 있는 다른 해파리 수 */
   others: number;
@@ -37,6 +41,10 @@ function loadPrefs(): Partial<GameState> {
     if (typeof p.variant === "number" && Number.isInteger(p.variant) && p.variant >= 0 && p.variant < WORLD.variants) {
       out.variant = p.variant;
     }
+    if (isValidNamePart(p.nameA, NAME_FIRST) && isValidNamePart(p.nameB, NAME_SECOND)) {
+      out.nameA = p.nameA;
+      out.nameB = p.nameB;
+    }
     return out;
   } catch {
     return {};
@@ -52,6 +60,8 @@ function seaFromUrl(): string {
   }
 }
 
+const initialName = randomNameParts();
+
 let state: GameState = {
   phase: "menu",
   paused: false,
@@ -60,6 +70,9 @@ let state: GameState = {
   muted: false,
   // 첫 방문자는 외형을 자동 배정받는다.
   variant: Math.floor(Math.random() * WORLD.variants),
+  // 이름도 처음 오면 자동으로 정해진다.
+  nameA: initialName[0],
+  nameB: initialName[1],
   net: "offline",
   others: 0,
   sea: seaFromUrl(),
@@ -71,8 +84,8 @@ const listeners = new Set<() => void>();
 
 function persist() {
   try {
-    const { ambientVol, sfxVol, muted, variant } = state;
-    localStorage.setItem(STORAGE_KEY, JSON.stringify({ ambientVol, sfxVol, muted, variant }));
+    const { ambientVol, sfxVol, muted, variant, nameA, nameB } = state;
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({ ambientVol, sfxVol, muted, variant, nameA, nameB }));
   } catch {
     // 저장 불가(사생활 보호 모드 등)여도 플레이에는 지장 없음
   }

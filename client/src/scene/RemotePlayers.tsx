@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useSyncExternalStore } from "react";
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { useFrame } from "@react-three/fiber";
 import {
   AdditiveBlending,
@@ -15,6 +15,7 @@ import { audio } from "../audio/AudioEngine.ts";
 import { clamp, lerpAngle, runtime } from "../game/runtime.ts";
 import { network, type Snapshot } from "../net/network.ts";
 import { Jellyfish } from "./Jellyfish.tsx";
+import { NameLabel } from "./NameLabel.tsx";
 import { createMotion } from "./jelly.ts";
 
 /** 수신한 상태를 이만큼 과거 시점으로 재생해 지연·끊김을 보간으로 흡수한다. */
@@ -113,7 +114,9 @@ function RemoteJellyfish({ id }: { id: string }) {
     bob: Math.random() * 10,
     bond: 0,
     glowSeen: -1,
+    rest: 0,
   });
+  const [resting, setResting] = useState(false);
   const remote = network.remotes.get(id);
   const variant = remote?.variant ?? 0;
 
@@ -135,6 +138,10 @@ function RemoteJellyfish({ id }: { id: string }) {
     const st = local.current;
     const t = clock.elapsedTime + st.bob;
     _pos.set(_sample.x, _sample.y, _sample.z);
+    // 쉬는 중이면 조금 가라앉아 졸듯이 천천히 맥동한다
+    if (r.resting !== resting) setResting(r.resting);
+    st.rest += ((r.resting ? 1 : 0) - st.rest) * (1 - Math.exp(-0.8 * dt));
+    _pos.y -= st.rest * 1.2;
 
     if (!st.ready) {
       st.ready = true;
@@ -153,9 +160,9 @@ function RemoteJellyfish({ id }: { id: string }) {
     _q.copy(g.quaternion).invert();
     motion.velLocal.lerp(_vel.applyQuaternion(_q), 1 - Math.exp(-3 * dt));
     motion.speed += (_sample.speed - motion.speed) * (1 - Math.exp(-4 * dt));
-    motion.pulse += dt * (1.4 + 2.2 * motion.speed);
+    motion.pulse += dt * (1.4 + 2.2 * motion.speed) * (1 - 0.55 * st.rest);
     // 새로 들어온 해파리는 서서히 나타나고, 연결이 끊긴 해파리는 흐려진다.
-    const targetOpacity = r.connected ? 1 : 0.25;
+    const targetOpacity = r.connected ? 1 - 0.2 * st.rest : 0.25;
     motion.opacity += (targetOpacity - motion.opacity) * (1 - Math.exp(-2 * dt));
 
     // ---------------- 빛으로 건네는 인사 ----------------
@@ -220,6 +227,7 @@ function RemoteJellyfish({ id }: { id: string }) {
       <group ref={group} position={[0, -1000, 0]}>
         <Jellyfish variant={variant} motion={motion} light />
       </group>
+      <NameLabel target={group} name={remote?.name ?? ""} resting={resting} />
       <points geometry={thread.geometry} material={thread.material} frustumCulled={false} renderOrder={6} />
     </>
   );

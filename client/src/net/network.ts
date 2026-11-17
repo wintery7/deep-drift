@@ -1,7 +1,9 @@
 import { Client, type Room } from "colyseus.js";
-import { MSG_GLOW, MSG_MOVE, PUBLIC_SEA, type MoveMessage } from "../../../shared/world.ts";
+import { MSG_GLOW, MSG_MOVE, MSG_REST, PUBLIC_SEA, type MoveMessage } from "../../../shared/world.ts";
+import { josa } from "../../../shared/names.ts";
 import { runtime } from "../game/runtime.ts";
-import { setState } from "../game/store.ts";
+import { getState, setState } from "../game/store.ts";
+import { toast } from "../game/toast.ts";
 
 export interface Snapshot {
   t: number;
@@ -19,6 +21,10 @@ export interface RemoteJelly {
   connected: boolean;
   /** 인사 횟수 카운터 — 값이 바뀌면 빛을 재생한다 */
   glow: number;
+  /** 익명 이름 */
+  name: string;
+  /** 쉬는 중 */
+  resting: boolean;
   buffer: Snapshot[];
 }
 
@@ -32,6 +38,8 @@ interface JellyLike {
   variant: number;
   connected: boolean;
   glow?: number;
+  name?: string;
+  resting?: boolean;
 }
 interface OceanStateLike {
   players: { forEach(cb: (p: JellyLike, id: string) => void): void };
@@ -61,6 +69,9 @@ class Network {
   private spawned = false;
   private variant = 0;
   private sea: string = PUBLIC_SEA;
+  private resting = false;
+  /** 방에 들어온 직후의 첫 상태 — 이미 있던 해파리는 "들어왔어요"라고 알리지 않는다 */
+  private initialSync = true;
   private retryTimer: ReturnType<typeof setTimeout> | null = null;
   private listeners = new Set<() => void>();
 
@@ -100,7 +111,19 @@ class Network {
       void room.leave(true).catch(() => {});
     }
     this.clearRemotes();
+    this.resting = false;
     setState({ net: "offline" });
+  }
+
+  sendRest(resting: boolean) {
+    if (resting === this.resting) return;
+    this.resting = resting;
+    if (!this.room) return;
+    try {
+      this.room.send(MSG_REST, resting);
+    } catch {
+      /* noop */
+    }
   }
 
   sendGlow() {
@@ -152,7 +175,12 @@ class Network {
           }
         }
       }
-      room ??= await this.client.joinOrCreate<OceanStateLike>("ocean", { variant: this.variant, sea: this.sea });
+      room ??= await this.client.joinOrCreate<OceanStateLike>("ocean", {
+        variant: this.variant,
+        sea: this.sea,
+        nameA: getState().nameA,
+        nameB: getState().nameB,
+      });
 
       if (!this.wantOnline) {
         void room.leave(true).catch(() => {});
@@ -175,6 +203,15 @@ class Network {
       /* noop */
     }
     setState({ net: "online" });
+    this.initialSync = true;
+    // 재접속했을 때 쉬는 중 상태를 다시 알려 준다
+    if (this.resting) {
+      try {
+        room.send(MSG_REST, true);
+      } catch {
+        /* noop */
+      }
+    }
 
     room.onStateChange((state) => this.sync(room, state));
     room.onError(() => {});
@@ -217,23 +254,37 @@ class Network {
       seen.add(id);
       let r = this.remotes.get(id);
       if (!r) {
-        r = { id, variant: p.variant, connected: p.connected, glow: p.glow ?? 0, buffer: [] };
+        r = {
+          id,
+          variant: p.variant,
+          connected: p.connected,
+          glow: p.glow ?? 0,
+          name: p.name ?? "",
+          resting: p.resting ?? false,
+          buffer: [],
+        };
         this.remotes.set(id, r);
         changed = true;
+        if (!this.initialSync && r.name) toast(`${r.name}${josa(r.name, "이", "가")} 바다에 들어왔어요`, 5000);
       }
       r.variant = p.variant;
       r.connected = p.connected;
       r.glow = p.glow ?? 0;
+      r.name = p.name ?? r.name;
+      r.resting = p.resting ?? false;
       r.buffer.push({ t: now, x: p.x, y: p.y, z: p.z, yaw: p.yaw, lean: p.lean, speed: p.speed });
       if (r.buffer.length > MAX_BUFFER) r.buffer.shift();
     });
 
     for (const id of [...this.remotes.keys()]) {
       if (!seen.has(id)) {
+        const gone = this.remotes.get(id);
+        if (gone?.name) toast(`${gone.name}${josa(gone.name, "은", "는")} 먼저 돌아갔어요`, 5000);
         this.remotes.delete(id);
         changed = true;
       }
     }
+    this.initialSync = false;
     if (changed) this.emit();
   }
 

@@ -37,6 +37,8 @@ export function terrainHeight(x: number, z: number): number {
 export const MSG_MOVE = "move";
 /** 빛으로 건네는 인사 */
 export const MSG_GLOW = "glow";
+/** 쉬는 중인지 (일시정지·다른 탭) — true/false */
+export const MSG_REST = "rest";
 
 /** 누구나 들어오는 기본 바다. 초대 링크는 별도의 이름을 가진 바다로 이어진다. */
 export const PUBLIC_SEA = "public";

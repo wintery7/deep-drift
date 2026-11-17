@@ -1,6 +1,7 @@
 import { Client, Room } from "colyseus";
 import { Jelly, OceanState } from "./OceanState.ts";
-import { MSG_GLOW, MSG_MOVE, WORLD, isValidSea, terrainHeight } from "../../shared/world.ts";
+import { MSG_GLOW, MSG_MOVE, MSG_REST, WORLD, isValidSea, terrainHeight } from "../../shared/world.ts";
+import { NAME_FIRST, NAME_SECOND, composeName, isValidNamePart, randomNameParts } from "../../shared/names.ts";
 
 /** 끊긴 사용자를 방에 남겨 두는 시간(초). 새로고침·순간 단절은 이 안에 복귀한다. */
 const RECONNECT_WINDOW_S = 12;
@@ -39,6 +40,11 @@ export class OceanRoom extends Room<OceanState> {
       jelly.glow = (jelly.glow + 1) % 256;
     });
     // 정의되지 않은 메시지는 조용히 무시한다.
+    this.onMessage(MSG_REST, (client, msg: unknown) => {
+      const jelly = this.state.players.get(client.sessionId);
+      if (!jelly || typeof msg !== "boolean") return;
+      jelly.resting = msg;
+    });
     this.onMessage("*", () => {});
   }
 
@@ -50,6 +56,13 @@ export class OceanRoom extends Room<OceanState> {
       isNum(requested) && Number.isInteger(requested) && requested >= 0 && requested < WORLD.variants
         ? requested
         : Math.floor(Math.random() * WORLD.variants);
+
+    // 이름은 단어 번호로만 받는다. 올바르지 않으면 무작위로 정한다.
+    const o = options as { nameA?: unknown; nameB?: unknown } | null;
+    const [ra, rb] = randomNameParts();
+    const na = o?.nameA;
+    const nb = o?.nameB;
+    jelly.name = composeName(isValidNamePart(na, NAME_FIRST) ? na : ra, isValidNamePart(nb, NAME_SECOND) ? nb : rb);
 
     // 중심부 근처에 서로 겹치지 않게 흩어 놓는다.
     let x = 0;
