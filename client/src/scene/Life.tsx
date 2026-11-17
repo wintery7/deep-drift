@@ -24,6 +24,7 @@ import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js
 import { terrainHeight } from "../../../shared/world.ts";
 import { audio } from "../audio/AudioEngine.ts";
 import { FOG_COLOR, FOG_DENSITY, mulberry32, runtime, worldTime } from "../game/runtime.ts";
+import { CAVE, caveSolid } from "./cave.ts";
 import { bellGeometry, createJellyMaterials, tentacleGeometry } from "./jelly.ts";
 
 // ---------------------------------------------------------------------
@@ -31,7 +32,7 @@ import { bellGeometry, createJellyMaterials, tentacleGeometry } from "./jelly.ts
 // ---------------------------------------------------------------------
 
 /** 높이에 따라 빛이 짙어지는 발광 식물용 material (geometry는 y 0..1 기준) */
-function createGlowMaterial(opts: { base: number; tip: number; sway: number; side?: Side }) {
+export function createGlowMaterial(opts: { base: number; tip: number; sway: number; side?: Side }) {
   return new ShaderMaterial({
     side: opts.side ?? FrontSide,
     uniforms: {
@@ -216,7 +217,13 @@ function Corals() {
       });
     }
 
-    const build = (geo: BufferGeometry, mat: ShaderMaterial, items: Item[]) => {
+    // 동굴 벽이 지나가는 자리에는 심지 않는다
+    const clearOfCave = (it: Item) => {
+      const h = terrainHeight(it.x, it.z);
+      return !caveSolid(it.x, h + 1, it.z, 1.5) && !caveSolid(it.x, h + 4, it.z, 1.5);
+    };
+    const build = (geo: BufferGeometry, mat: ShaderMaterial, all: Item[]) => {
+      const items = all.filter(clearOfCave);
       const mesh = new InstancedMesh(geo, mat, items.length);
       items.forEach((it, i) => {
         dummy.position.set(it.x, terrainHeight(it.x, it.z) - 0.12, it.z);
@@ -405,21 +412,23 @@ const SWARM_COLORS = ["#8a66ff", "#a98bff", "#6f8cff", "#5fc6ff", "#c58bff"];
 function AmbientJellies() {
   const { bell, tentacles, materials, items } = useMemo(() => {
     const rng = mulberry32(555);
+    // [x, y, z, 수평 반경, 수직 폭, 마릿수]
     const centers = [
-      [26, 6, -18],
-      [-34, 2, 22],
-      [8, 12, 44],
-      [-20, -4, -46],
+      [26, 6, -18, 11, 12, 11],
+      [-34, 2, 22, 11, 12, 11],
+      [8, 12, 44, 11, 12, 11],
+      [-6, -4, -54, 11, 12, 11],
+      // 동굴 안에서 쉬고 있는 작은 무리
+      [CAVE.x, CAVE.y + 5, CAVE.z, 5, 4, 6],
     ];
     const items: { x: number; y: number; z: number; s: number; ph: number; drift: number }[] = [];
-    for (const [cx, cy, cz] of centers) {
-      const n = 11;
+    for (const [cx, cy, cz, spread, tall, n] of centers) {
       for (let i = 0; i < n; i++) {
         const a = rng() * Math.PI * 2;
-        const d = Math.sqrt(rng()) * 11;
+        const d = Math.sqrt(rng()) * spread;
         items.push({
           x: cx + Math.cos(a) * d,
-          y: cy + (rng() - 0.5) * 12,
+          y: cy + (rng() - 0.5) * tall,
           z: cz + Math.sin(a) * d,
           s: 0.45 + rng() * 0.9,
           ph: rng() * 6.28,
@@ -494,7 +503,7 @@ export function Life() {
     <>
       <Corals />
       <AmbientJellies />
-      <FishSchool seed={3} count={46} radius={30} height={-6} color="#9fe6ff" />
+      <FishSchool seed={3} count={46} radius={24} height={-6} color="#9fe6ff" />
       <FishSchool seed={8} count={38} radius={48} height={2} color="#ffc2e4" />
       <FishSchool seed={13} count={30} radius={18} height={8} color="#c7b8ff" />
       <Whale />

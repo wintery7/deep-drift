@@ -7,6 +7,7 @@ import { readInput } from "../game/input.ts";
 import { clamp, lerpAngle, runtime } from "../game/runtime.ts";
 import { getState, useGame } from "../game/store.ts";
 import { network } from "../net/network.ts";
+import { CAVE, caveInsideness, caveResolve, caveSolid } from "./cave.ts";
 import { Jellyfish } from "./Jellyfish.tsx";
 import { createMotion } from "./jelly.ts";
 
@@ -38,6 +39,7 @@ export function PlayerRig() {
   });
   const sendTimer = useRef(0);
   const lastBeat = useRef(0);
+  const lastEnclosure = useRef(0);
 
   // 마우스 드래그로 시점을 둘러볼 수 있다 (선택 사항 — 키보드만으로도 충분하다).
   useEffect(() => {
@@ -140,6 +142,19 @@ export function PlayerRig() {
     }
     pos.y = clamp(pos.y, terrainHeight(pos.x, pos.z) + WORLD.floorClearance, WORLD.ceiling);
 
+    // 동굴 바위는 통과하지 못한다 (구멍으로는 드나든다)
+    const nearCave = Math.hypot(pos.x - CAVE.x, pos.z - CAVE.z) < CAVE.radius + 14;
+    if (nearCave && caveResolve(pos, 0.9)) {
+      pos.y = Math.max(pos.y, terrainHeight(pos.x, pos.z) + WORLD.floorClearance);
+      vel.multiplyScalar(1 - damp(4, dt)); // 벽에 닿으면 부드럽게 멈춘다
+    }
+    // 동굴 안에서는 소리가 먹먹해진다
+    const enclosure = nearCave ? caveInsideness(pos.x, pos.y, pos.z) : 0;
+    if (Math.abs(enclosure - lastEnclosure.current) > 0.02 || (enclosure === 0) !== (lastEnclosure.current === 0)) {
+      lastEnclosure.current = enclosure;
+      audio.setEnclosure(enclosure);
+    }
+
     // ---------------- 자세 ----------------
     const hSpeed = Math.hypot(vel.x, vel.z);
     const speed = clamp(vel.length() / WORLD.maxSpeed, 0, 1);
@@ -184,6 +199,26 @@ export function PlayerRig() {
     // 해저 지형을 뚫지 않게
     _desired.y = Math.max(_desired.y, terrainHeight(_desired.x, _desired.z) + 1.0);
     _look.set(pos.x, pos.y + 0.5, pos.z);
+    // 해파리와 카메라 사이에 동굴 벽이 끼지 않게, 막히는 지점 앞까지만 물러난다
+    if (nearCave) {
+      const STEPS = 12;
+      let safe = 1;
+      for (let i = 1; i <= STEPS; i++) {
+        const k = i / STEPS;
+        if (
+          caveSolid(
+            _look.x + (_desired.x - _look.x) * k,
+            _look.y + (_desired.y - _look.y) * k,
+            _look.z + (_desired.z - _look.z) * k,
+            0.5,
+          )
+        ) {
+          safe = Math.max(0.12, (i - 1) / STEPS);
+          break;
+        }
+      }
+      if (safe < 1) _desired.lerpVectors(_look, _desired, safe);
+    }
 
     if (!c.ready || camera.position.distanceToSquared(_desired) > 60 * 60) {
       // 첫 프레임이거나 스폰 위치로 순간 이동한 경우: 보간 없이 바로 자리를 잡는다.

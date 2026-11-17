@@ -1,5 +1,6 @@
 import { Canvas } from "@react-three/fiber";
 import { Bloom, EffectComposer, Vignette } from "@react-three/postprocessing";
+import { Cave } from "./Cave.tsx";
 import { Environment } from "./Environment.tsx";
 import { Life } from "./Life.tsx";
 import { PlayerRig } from "./PlayerRig.tsx";
@@ -20,6 +21,7 @@ export function OceanScene() {
     >
       <Environment />
       <Life />
+      <Cave />
       <PlayerRig />
       <RemotePlayers />
       <EffectComposer multisampling={4}>

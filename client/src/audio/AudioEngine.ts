@@ -32,6 +32,8 @@ class AudioEngine {
   private whalePos = new V3(60, 14, 0);
   private listenerPos = new V3();
   private lastSwish = 0;
+  private muffle!: BiquadFilterNode;
+  private caveTone!: GainNode;
 
   /** 사용자 제스처(입장 버튼) 안에서 호출해야 한다. */
   start() {
@@ -95,6 +97,15 @@ class AudioEngine {
       l.setPosition(p.x, p.y, p.z);
       l.setOrientation(_fwd.x, _fwd.y, _fwd.z, _up.x, _up.y, _up.z);
     }
+  }
+
+  /** 0 = 트인 바다, 1 = 동굴 깊숙한 곳 */
+  setEnclosure(k: number) {
+    const ctx = this.ctx;
+    if (!ctx || !this.active) return;
+    const t = ctx.currentTime;
+    this.muffle.frequency.setTargetAtTime(18000 * Math.pow(1300 / 18000, k), t, 0.5);
+    this.caveTone.gain.setTargetAtTime(0.07 * k, t, 0.9);
   }
 
   setWhalePosition(p: Vector3) {
@@ -172,7 +183,12 @@ class AudioEngine {
 
     this.master = ctx.createGain();
     this.master.gain.value = 0;
-    this.master.connect(limiter);
+    // 동굴 안에서 소리를 먹먹하게 만드는 필터
+    this.muffle = ctx.createBiquadFilter();
+    this.muffle.type = "lowpass";
+    this.muffle.frequency.value = 18000;
+    this.muffle.Q.value = 0.4;
+    this.master.connect(this.muffle).connect(limiter);
 
     this.ambient = ctx.createGain();
     this.ambient.connect(this.master);
@@ -228,6 +244,22 @@ class AudioEngine {
     this.lfo(0.09, 0.035, washGain.gain);
     this.lfo(0.031, 160, washBp.frequency);
     wash.start(0, 3);
+
+    // --- 동굴 안에서만 들리는 낮은 울림 ---
+    this.caveTone = ctx.createGain();
+    this.caveTone.gain.value = 0;
+    this.caveTone.connect(this.ambient);
+    this.caveTone.connect(this.ambientReverb);
+    [146.83, 220.0, 293.66].forEach((f, i) => {
+      const osc = ctx.createOscillator();
+      osc.type = "sine";
+      osc.frequency.value = f;
+      const g = ctx.createGain();
+      g.gain.value = [0.6, 0.35, 0.18][i];
+      osc.connect(g).connect(this.caveTone);
+      this.lfo(0.05 + i * 0.023, g.gain.value * 0.5, g.gain);
+      osc.start();
+    });
 
     // --- 드론 ---
     [

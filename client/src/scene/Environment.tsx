@@ -17,6 +17,7 @@ import {
 } from "three";
 import { WORLD, terrainHeight } from "../../../shared/world.ts";
 import { FOG_COLOR, FOG_DENSITY, mulberry32 } from "../game/runtime.ts";
+import { CAVE, CAVE_OPENINGS } from "./cave.ts";
 
 // ---------------------------------------------------------------------
 // 수면 쪽으로 밝아지는 하늘(물) 돔
@@ -158,7 +159,7 @@ function LightShafts() {
     });
 
     const COUNT = 16;
-    const mesh = new InstancedMesh(geometry, material, COUNT);
+    const mesh = new InstancedMesh(geometry, material, COUNT + 1);
     mesh.frustumCulled = false;
     const rng = mulberry32(42);
     const dummy = new Object3D();
@@ -172,6 +173,13 @@ function LightShafts() {
       dummy.updateMatrix();
       mesh.setMatrixAt(i, dummy.matrix);
     }
+    // 동굴 천장의 빛 구멍으로 떨어지는 한 줄기
+    const sky = CAVE_OPENINGS[2].axis;
+    dummy.position.set(CAVE.x + sky[0] * CAVE.radius, CAVE.y + 17, CAVE.z + sky[2] * CAVE.radius);
+    dummy.rotation.set(0, 0, 0);
+    dummy.scale.set(0.6, 0.27, 0.6);
+    dummy.updateMatrix();
+    mesh.setMatrixAt(COUNT, dummy.matrix);
     mesh.instanceMatrix.needsUpdate = true;
     return { mesh, material };
   }, []);
