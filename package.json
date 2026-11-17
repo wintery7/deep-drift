@@ -8,6 +8,8 @@
     "server"
   ],
   "scripts": {
+    "dev": "node scripts/dev.mjs",
+    "play": "npm run build && npm start",
     "dev:server": "npm run dev -w server",
     "dev:client": "npm run dev -w client",
     "build": "npm run build -w client",
