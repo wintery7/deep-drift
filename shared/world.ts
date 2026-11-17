@@ -54,4 +54,6 @@ export interface MoveMessage {
   lean: number;
   /** 0..1 속도 비율 — 촉수/맥동 애니메이션에 사용 */
   speed: number;
+  /** 0..1 자람 — 촉수와 꼬리빛의 길이 (보이기만 하는 값) */
+  growth: number;
 }

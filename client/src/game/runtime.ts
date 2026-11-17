@@ -16,6 +16,11 @@ export const runtime = {
   /** 곁에 머무는 해파리와의 교감 0..1 (가장 깊은 값) */
   bond: 0,
   bondAccum: 0,
+  /** 0..1 자람 (growth.ts가 저장소에서 불러와 채운다) */
+  growth: 0,
+  /** 누군가의 뒤를 따라 유영하는 중인가 */
+  following: false,
+  followAccum: 0,
 };
 
 /** 내 해파리의 위치를 셰이더에 전하는 공용 uniform — 지나가면 산호가 은은히 밝아진다 */

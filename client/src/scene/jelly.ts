@@ -25,6 +25,8 @@ export interface JellyMotion {
   flash: number;
   /** 곁에 누군가 머물 때 은은히 밝아지는 정도 0..1 */
   boost: number;
+  /** 0..1 자람 — 촉수가 길어지고 조금 더 밝아진다 */
+  grow: number;
 }
 
 export const createMotion = (): JellyMotion => ({
@@ -34,6 +36,7 @@ export const createMotion = (): JellyMotion => ({
   opacity: 1,
   flash: 0,
   boost: 0,
+  grow: 0,
 });
 
 // ---------------------------------------------------------------------
@@ -90,6 +93,7 @@ export const tentacleGeometry: BufferGeometry = (() => {
 const COMMON_VERT = /* glsl */ `
   uniform float uPulse;
   uniform float uSpeed;
+  uniform float uGrow;
   uniform vec3 uColor;
   uniform vec3 uGlow;
   #ifdef USE_INSTANCING
@@ -106,6 +110,7 @@ const COMMON_FRAG = /* glsl */ `
   uniform float uOpacity;
   uniform float uFlash;
   uniform float uBoost;
+  uniform float uGrow;
   varying vec3 vColor;
   varying vec3 vGlow;
   varying float vDepth;
@@ -175,7 +180,7 @@ const BELL_FRAG = /* glsl */ `
     // 정수리 안쪽에서 비치는 빛
     col += vGlow * (1.0 - smoothstep(0.0, 0.5, vT)) * 0.22;
 
-    col *= 1.0 + uBoost * 0.35;
+    col *= 1.0 + uBoost * 0.35 + uGrow * 0.2;
     col += vGlow * uFlash * 0.5;
     float alpha = 0.2 + 0.6 * fres + 0.3 * rim + uFlash * 0.25;
     float fog = fogFactor();
@@ -198,8 +203,9 @@ const TENTACLE_VERT = /* glsl */ `
     ${VERT_SETUP}
     vec3 p = position;
     p.xz *= 1.0 - amp * contract * (1.0 - aT);
+    p.y *= 1.0 + uGrow * 0.9; // 자랄수록 길어진다 (다 자라면 약 1.9배)
 
-    float sway = aT * aT;
+    float sway = aT * aT * (1.0 + uGrow * 0.9);
     float w = uTime * 1.3 + aPhase + seed;
     p.x += sin(w - aT * 5.0) * 0.22 * sway + sin(w * 0.6 + aT * 3.0) * 0.08 * aT;
     p.z += cos(w * 0.9 - aT * 4.0) * 0.22 * sway;
@@ -227,7 +233,7 @@ const TENTACLE_FRAG = /* glsl */ `
     // 촉수를 따라 흘러내리는 빛
     float band = pow(0.5 + 0.5 * sin(vAT * 9.0 - uTime * 1.8 + vPh), 5.0);
     col *= 0.55 + 0.9 * band;
-    col *= 1.0 + uBoost * 0.45 + uFlash * 1.0;
+    col *= 1.0 + uBoost * 0.45 + uFlash * 1.0 + uGrow * 0.55;
     float alpha = pow(clamp(1.0 - vAT, 0.0, 1.0), 0.8) * 0.55 * uOpacity;
     float fog = fogFactor();
     gl_FragColor = vec4(col * (1.0 - fog), alpha * (1.0 - fog));
@@ -242,6 +248,7 @@ function baseUniforms() {
     uOpacity: { value: 1 },
     uFlash: { value: 0 },
     uBoost: { value: 0 },
+    uGrow: { value: 0 },
     uColor: { value: new Color("#8a66ff") },
     uGlow: { value: new Color("#dccdff") },
     uVelLocal: { value: new Vector3() },

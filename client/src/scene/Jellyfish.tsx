@@ -51,6 +51,7 @@ export function Jellyfish({ variant, motion, light = false }: Props) {
       u.uOpacity.value = motion.opacity;
       u.uFlash.value = flash;
       u.uBoost.value = motion.boost;
+      u.uGrow.value = motion.grow;
       u.uVelLocal.value.copy(motion.velLocal);
     }
     if (core.current) {

@@ -15,6 +15,7 @@ import { audio } from "../audio/AudioEngine.ts";
 import { clamp, lerpAngle, runtime } from "../game/runtime.ts";
 import { network, type Snapshot } from "../net/network.ts";
 import { Jellyfish } from "./Jellyfish.tsx";
+import { Trail } from "./Trail.tsx";
 import { createMotion } from "./jelly.ts";
 
 /** 수신한 상태를 이만큼 과거 시점으로 재생해 지연·끊김을 보간으로 흡수한다. */
@@ -22,6 +23,8 @@ const INTERP_DELAY_MS = 120;
 /** 이 거리 안에서 함께 머물면 교감이 깊어진다 */
 const BOND_NEAR = 7;
 const BOND_FAR = 11;
+/** 이 거리 안에서 뒤를 따라 유영하면 행렬이 된다 */
+const FOLLOW_RANGE = 12;
 const THREAD_POINTS = 18;
 
 const _sample: Snapshot = { t: 0, x: 0, y: 0, z: 0, yaw: 0, lean: 0, speed: 0 };
@@ -157,6 +160,7 @@ function RemoteJellyfish({ id }: { id: string }) {
     // 새로 들어온 해파리는 서서히 나타나고, 연결이 끊긴 해파리는 흐려진다.
     const targetOpacity = r.connected ? 1 : 0.25;
     motion.opacity += (targetOpacity - motion.opacity) * (1 - Math.exp(-2 * dt));
+    motion.grow += (r.growth - motion.grow) * (1 - Math.exp(-1.5 * dt));
 
     // ---------------- 빛으로 건네는 인사 ----------------
     if (st.glowSeen === -1) {
@@ -169,8 +173,21 @@ function RemoteJellyfish({ id }: { id: string }) {
 
     // ---------------- 교감: 곁에 머물수록 깊어지고, 멀어지면 조용히 옅어진다 ----------------
     const d = g.position.distanceTo(runtime.pos);
-    if (d < BOND_NEAR && r.connected) st.bond = Math.min(1, st.bond + dt / 4);
-    else if (d > BOND_FAR || !r.connected) st.bond = Math.max(0, st.bond - dt / 2.5);
+    // 뒤를 따라 유영하는가: 상대의 뒤쪽에서, 같은 방향으로 함께 움직일 때
+    const fx = Math.sin(_sample.yaw);
+    const fz = Math.cos(_sample.yaw);
+    const behind = (runtime.pos.x - g.position.x) * fx + (runtime.pos.z - g.position.z) * fz;
+    const mySpeed = Math.hypot(runtime.vel.x, runtime.vel.z);
+    const following =
+      r.connected &&
+      d < FOLLOW_RANGE &&
+      behind < -1 &&
+      _sample.speed > 0.12 &&
+      mySpeed > 0.8 &&
+      (runtime.vel.x * fx + runtime.vel.z * fz) / mySpeed > 0.6;
+    if (following) runtime.followAccum = 1;
+    if ((d < BOND_NEAR || following) && r.connected) st.bond = Math.min(1, st.bond + dt / (following ? 2 : 4));
+    else if ((d > BOND_FAR && !following) || !r.connected) st.bond = Math.max(0, st.bond - dt / 2.5);
     const bond = st.bond * st.bond * (3 - 2 * st.bond);
     motion.boost = bond;
     runtime.bondAccum = Math.max(runtime.bondAccum, bond);
@@ -181,7 +198,7 @@ function RemoteJellyfish({ id }: { id: string }) {
     }
 
     const tu = thread.material.uniforms;
-    const threadOpacity = bond * clamp((BOND_FAR + 2 - d) / 4, 0, 1) * motion.opacity;
+    const threadOpacity = bond * clamp((FOLLOW_RANGE + 1 - d) / 4, 0, 1) * motion.opacity;
     tu.uOpacity.value = threadOpacity;
     if (threadOpacity > 0.005) {
       tu.uTime.value = clock.elapsedTime;
@@ -220,6 +237,7 @@ function RemoteJellyfish({ id }: { id: string }) {
       <group ref={group} position={[0, -1000, 0]}>
         <Jellyfish variant={variant} motion={motion} light />
       </group>
+      <Trail target={group} motion={motion} variant={variant} />
       <points geometry={thread.geometry} material={thread.material} frustumCulled={false} renderOrder={6} />
     </>
   );

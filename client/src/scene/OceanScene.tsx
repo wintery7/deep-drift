@@ -3,6 +3,7 @@ import { Bloom, EffectComposer, Vignette } from "@react-three/postprocessing";
 import { Cave } from "./Cave.tsx";
 import { Environment } from "./Environment.tsx";
 import { Life } from "./Life.tsx";
+import { Plankton } from "./Plankton.tsx";
 import { PlayerRig } from "./PlayerRig.tsx";
 import { RemotePlayers } from "./RemotePlayers.tsx";
 
@@ -22,6 +23,7 @@ export function OceanScene() {
       <Environment />
       <Life />
       <Cave />
+      <Plankton />
       <PlayerRig />
       <RemotePlayers />
       <EffectComposer multisampling={4}>

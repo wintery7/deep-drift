@@ -3,12 +3,14 @@ import { useFrame, useThree } from "@react-three/fiber";
 import { Quaternion, Vector3, type Group } from "three";
 import { WORLD, terrainHeight } from "../../../shared/world.ts";
 import { audio } from "../audio/AudioEngine.ts";
+import { addGrowth } from "../game/growth.ts";
 import { readInput } from "../game/input.ts";
 import { clamp, lerpAngle, playerUniform, runtime } from "../game/runtime.ts";
 import { getState, useGame } from "../game/store.ts";
 import { network } from "../net/network.ts";
 import { CAVE, caveInsideness, caveResolve, caveSolid } from "./cave.ts";
 import { Jellyfish } from "./Jellyfish.tsx";
+import { Trail } from "./Trail.tsx";
 import { createMotion } from "./jelly.ts";
 
 const CAM_DISTANCE = 7.5;
@@ -96,6 +98,11 @@ export function PlayerRig() {
       runtime.flash = false;
       motion.flash = 1;
     }
+    runtime.following = runtime.followAccum > 0;
+    runtime.followAccum = 0;
+    // 누군가 곁에 머무는 동안에는 플랑크톤이 없어도 천천히 자란다
+    if (playing && runtime.bond > 0.05) addGrowth(0.0009 * runtime.bond * dt);
+    motion.grow += (runtime.growth - motion.grow) * damp(1.5, dt);
 
     // ---------------- 입력 ----------------
     const input = playing && !s.paused ? readInput() : { forward: 0, strafe: 0, vertical: 0 };
@@ -256,13 +263,17 @@ export function PlayerRig() {
         yaw: runtime.yaw,
         lean: runtime.lean,
         speed,
+        growth: runtime.growth,
       });
     }
   });
 
   return (
-    <group ref={group}>
-      <Jellyfish variant={variant} motion={motion} light />
-    </group>
+    <>
+      <group ref={group}>
+        <Jellyfish variant={variant} motion={motion} light />
+      </group>
+      <Trail target={group} motion={motion} variant={variant} />
+    </>
   );
 }

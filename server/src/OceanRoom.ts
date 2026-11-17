@@ -51,6 +51,10 @@ export class OceanRoom extends Room<OceanState> {
         ? requested
         : Math.floor(Math.random() * WORLD.variants);
 
+    // 자람은 각자의 브라우저에 쌓여 있다가 입장할 때 함께 들어온다 (겉모습에만 쓰이는 값).
+    const growth = (options as { growth?: unknown } | null)?.growth;
+    jelly.growth = isNum(growth) ? clamp(growth, 0, 1) : 0;
+
     // 중심부 근처에 서로 겹치지 않게 흩어 놓는다.
     let x = 0;
     let z = 0;
@@ -149,5 +153,9 @@ export class OceanRoom extends Room<OceanState> {
     jelly.yaw = Math.atan2(Math.sin(m.yaw), Math.cos(m.yaw));
     jelly.lean = clamp(m.lean, -1.3, 1.3);
     jelly.speed = clamp(m.speed, 0, 1);
+    if (isNum(m.growth)) {
+      // 줄어드는 것은 자유롭지만, 한 번에 늘어나는 폭은 제한한다
+      jelly.growth = Math.min(clamp(m.growth, 0, 1), jelly.growth + 0.2 * dt + 0.02);
+    }
   }
 }

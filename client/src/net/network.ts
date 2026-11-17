@@ -19,6 +19,7 @@ export interface RemoteJelly {
   connected: boolean;
   /** 인사 횟수 카운터 — 값이 바뀌면 빛을 재생한다 */
   glow: number;
+  growth: number;
   buffer: Snapshot[];
 }
 
@@ -32,6 +33,7 @@ interface JellyLike {
   variant: number;
   connected: boolean;
   glow?: number;
+  growth?: number;
 }
 interface OceanStateLike {
   players: { forEach(cb: (p: JellyLike, id: string) => void): void };
@@ -152,7 +154,7 @@ class Network {
           }
         }
       }
-      room ??= await this.client.joinOrCreate<OceanStateLike>("ocean", { variant: this.variant, sea: this.sea });
+      room ??= await this.client.joinOrCreate<OceanStateLike>("ocean", { variant: this.variant, sea: this.sea, growth: runtime.growth });
 
       if (!this.wantOnline) {
         void room.leave(true).catch(() => {});
@@ -217,13 +219,14 @@ class Network {
       seen.add(id);
       let r = this.remotes.get(id);
       if (!r) {
-        r = { id, variant: p.variant, connected: p.connected, glow: p.glow ?? 0, buffer: [] };
+        r = { id, variant: p.variant, connected: p.connected, glow: p.glow ?? 0, growth: p.growth ?? 0, buffer: [] };
         this.remotes.set(id, r);
         changed = true;
       }
       r.variant = p.variant;
       r.connected = p.connected;
       r.glow = p.glow ?? 0;
+      r.growth = p.growth ?? 0;
       r.buffer.push({ t: now, x: p.x, y: p.y, z: p.z, yaw: p.yaw, lean: p.lean, speed: p.speed });
       if (r.buffer.length > MAX_BUFFER) r.buffer.shift();
     });

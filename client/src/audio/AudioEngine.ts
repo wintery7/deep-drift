@@ -162,6 +162,29 @@ class AudioEngine {
     panner.connect(this.sfxReverb);
   }
 
+  private lastSparkle = 0;
+
+  /** 빛 플랑크톤을 머금을 때의 아주 작은 반짝임 */
+  sparkle(strength = 1) {
+    const ctx = this.ctx;
+    if (!ctx || !this.active || ctx.state !== "running") return;
+    const now = ctx.currentTime;
+    if (now - this.lastSparkle < 0.09) return;
+    this.lastSparkle = now;
+    const osc = ctx.createOscillator();
+    osc.type = "sine";
+    osc.frequency.value = pick(CHIME_NOTES) * 2;
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0, now);
+    g.gain.linearRampToValueAtTime(0.035 * strength, now + 0.01);
+    g.gain.exponentialRampToValueAtTime(0.0001, now + 0.6);
+    osc.connect(g);
+    g.connect(this.sfx);
+    g.connect(this.sfxReverb);
+    osc.start(now);
+    osc.stop(now + 0.65);
+  }
+
   // ------------------------------------------------------------------
 
   private applyLevels(timeConstant: number) {
