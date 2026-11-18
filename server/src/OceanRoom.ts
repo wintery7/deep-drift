@@ -327,6 +327,7 @@ export class OceanRoom extends Room<OceanState> {
     // --- 이동 속도 검증: 지난 메시지 이후 갈 수 있는 거리까지만 인정 ---
     const dt = clamp((now - meta.lastMoveAt) / 1000, 0, 0.5);
     meta.lastMoveAt = now;
+    // 1.5배 여유: 맥동할 때의 추진, 네트워크 지연, 술래의 속도 보너스(TAG.itSpeedBoost)를 모두 덮는다
     const maxDist = WORLD.maxSpeed * 1.5 * dt + 0.4;
 
     let dx = m.x - jelly.x;

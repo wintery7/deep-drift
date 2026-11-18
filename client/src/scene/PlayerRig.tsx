@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef } from "react";
 import { useFrame, useThree } from "@react-three/fiber";
 import { Quaternion, Vector3, type Group } from "three";
-import { WORLD, terrainHeight } from "../../../shared/world.ts";
+import { TAG, WORLD, terrainHeight } from "../../../shared/world.ts";
 import { audio } from "../audio/AudioEngine.ts";
 import { addGrowth } from "../game/growth.ts";
 import { readInput } from "../game/input.ts";
@@ -124,7 +124,9 @@ export function PlayerRig() {
     runtime.pulse = motion.pulse;
     // 우산을 오므리는 순간에 조금 더 힘차게 나아간다.
     const surge = 0.78 + 0.34 * Math.max(0, Math.sin(motion.pulse));
-    _target.copy(_wish).multiplyScalar(WORLD.maxSpeed * inputMag * surge);
+    // 술래는 조금 더 빠르다
+    const topSpeed = WORLD.maxSpeed * (runtime.it ? TAG.itSpeedBoost : 1);
+    _target.copy(_wish).multiplyScalar(topSpeed * inputMag * surge);
     vel.lerp(_target, damp(inputMag > 0 ? 1.5 : 0.65, dt));
 
     if (inputMag > 0.1) {
@@ -148,7 +150,7 @@ export function PlayerRig() {
     if (pos.y < floor + 2.5) vel.y += ((floor + 2.5 - pos.y) / 2.5) ** 2 * 9 * dt;
     if (pos.y > WORLD.ceiling - 4) vel.y -= ((pos.y - (WORLD.ceiling - 4)) / 4) ** 2 * 9 * dt;
 
-    if (vel.length() > WORLD.maxSpeed) vel.setLength(WORLD.maxSpeed);
+    if (vel.length() > topSpeed) vel.setLength(topSpeed);
     pos.addScaledVector(vel, dt);
 
     // 마지막 안전장치

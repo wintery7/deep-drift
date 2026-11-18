@@ -68,7 +68,7 @@ export function TagDirector() {
         setState({ tag: ocean.it ? "it" : "runner", tagPartner: name, tagEndsAt: Date.now() + TAG.durationMs });
         toast(
           ocean.it
-            ? `술래잡기 시작! 내가 술래예요. ${name}에게 닿으면 넘겨줘요.`
+            ? `술래잡기 시작! 내가 술래예요. 술래는 조금 더 빨라요. ${name}에게 닿으면 넘겨줘요.`
             : `술래잡기 시작! ${name}${josa(name, "이", "가")} 술래예요. 도망쳐요!`,
           6000,
         );
@@ -82,7 +82,7 @@ export function TagDirector() {
     } else if (ocean.tagWith && ocean.it !== s.it) {
       s.it = ocean.it;
       setState({ tag: ocean.it ? "it" : "runner" });
-      toast(ocean.it ? "잡혔어요! 이제 내가 술래예요." : "잡았다! 이제 도망쳐요.", 2500);
+      toast(ocean.it ? "잡혔어요! 이제 내가 술래예요. 조금 더 빨라졌어요." : "잡았다! 이제 도망쳐요.", 2500);
       audio.tok();
     }
     runtime.it = !!ocean.tagWith && ocean.it;
