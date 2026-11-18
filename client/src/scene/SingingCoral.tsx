@@ -140,9 +140,12 @@ export function SingingCoral() {
         void main() {
           // 관을 따라 천천히 오르는 빛의 띠
           float band = 0.5 + 0.5 * sin(vH * 10.0 - uTime * 1.4 + vSeed * 6.0);
-          float glow = 0.12 + 0.42 * pow(vH, 2.2) + 0.1 * band * vH;
+          // pow()에 음수가 들어가면 NaN이 되고, 빛 번짐이 그 한 점을 화면 전체로 번지게 해 화면이 깜빡인다.
+          // 오차로 범위를 아주 조금만 벗어나도 그렇게 되므로 모든 pow 입력을 0..1로 묶는다.
+          float h = clamp(vH, 0.0, 1.0);
+          float glow = 0.12 + 0.42 * pow(h, 2.2) + 0.1 * band * h;
           vec3 col = vColor * glow * (0.7 + 0.3 * vFacing);
-          col += vColor * pow(1.0 - vFacing, 2.0) * 0.35 * vH;
+          col += vColor * pow(clamp(1.0 - vFacing, 0.0, 1.0), 2.0) * 0.35 * h;
           // 울린 순간에는 관 전체가 밝아지고, 빛이 위로 솟는다
           float rise = smoothstep(vH - 0.25, vH, 1.0 - vFlash);
           col += mix(vColor, vec3(1.0), 0.15) * vFlash * (0.45 + 1.1 * vH) * (0.6 + 0.4 * rise);

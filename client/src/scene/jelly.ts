@@ -236,7 +236,7 @@ const TENTACLE_FRAG = /* glsl */ `
   void main() {
     vec3 col = mix(vGlow, vColor, smoothstep(0.0, 0.6, vAT));
     // 촉수를 따라 흘러내리는 빛
-    float band = pow(0.5 + 0.5 * sin(vAT * 9.0 - uTime * 1.8 + vPh), 5.0);
+    float band = pow(clamp(0.5 + 0.5 * sin(vAT * 9.0 - uTime * 1.8 + vPh), 0.0, 1.0), 5.0);
     col *= 0.55 + 0.9 * band;
     col *= 1.0 + uBoost * 0.45 + uFlash * 1.0 + uGrow * 0.55;
     float alpha = pow(clamp(1.0 - vAT, 0.0, 1.0), 0.8) * 0.55 * uOpacity;
