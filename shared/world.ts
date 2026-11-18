@@ -85,4 +85,6 @@ export interface MoveMessage {
   speed: number;
   /** 0..1 자람 — 촉수와 꼬리빛의 길이 (보이기만 하는 값) */
   growth: number;
+  /** 보낸 쪽의 시각(ms, performance.now) — 받는 쪽 보간용 */
+  t: number;
 }

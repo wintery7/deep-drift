@@ -233,6 +233,7 @@ export class OceanRoom extends Room<OceanState> {
     jelly.yaw = Math.atan2(Math.sin(m.yaw), Math.cos(m.yaw));
     jelly.lean = clamp(m.lean, -1.3, 1.3);
     jelly.speed = clamp(m.speed, 0, 1);
+    if (isNum(m.t)) jelly.t = m.t;
     if (isNum(m.growth)) {
       // 줄어드는 것은 자유롭지만, 한 번에 늘어나는 폭은 제한한다
       jelly.growth = Math.min(clamp(m.growth, 0, 1), jelly.growth + 0.2 * dt + 0.02);

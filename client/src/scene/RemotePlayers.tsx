@@ -136,7 +136,7 @@ function RemoteJellyfish({ id }: { id: string }) {
     const r = network.remotes.get(id);
     const g = group.current;
     if (!r || !g) return;
-    if (!sample(r.buffer, performance.now() - INTERP_DELAY_MS, _sample)) return;
+    if (!sample(r.buffer, performance.now() - (r.offset ?? 0) - INTERP_DELAY_MS, _sample)) return;
 
     const st = local.current;
     const t = clock.elapsedTime + st.bob;
@@ -242,7 +242,7 @@ function RemoteJellyfish({ id }: { id: string }) {
   return (
     <>
       <group ref={group} position={[0, -1000, 0]}>
-        <Jellyfish variant={variant} motion={motion} light />
+        <Jellyfish variant={variant} motion={motion} />
       </group>
       <Trail target={group} motion={motion} variant={variant} />
       <NameLabel target={group} name={remote?.name ?? ""} resting={resting} />

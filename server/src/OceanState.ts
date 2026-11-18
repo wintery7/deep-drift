@@ -7,6 +7,8 @@ export class Jelly extends Schema {
   @type("float32") yaw = 0;
   @type("float32") lean = 0;
   @type("float32") speed = 0;
+  /** 보낸 쪽의 시각(ms) — 다른 클라이언트가 보간에 쓴다 */
+  @type("float64") t = 0;
   @type("uint8") variant = 0;
   @type("boolean") connected = true;
   /** 익명 이름 — 서버가 정해진 단어 목록에서 조합한다 */

@@ -26,6 +26,9 @@ export interface RemoteJelly {
   name: string;
   /** 쉬는 중 */
   resting: boolean;
+  /** 스냅샷 시각은 보낸 쪽 시계 기준. 내 시계 - offset = 보낸 쪽 시계 */
+  offset: number | null;
+  lastT: number;
   buffer: Snapshot[];
 }
 
@@ -42,6 +45,7 @@ interface JellyLike {
   growth?: number;
   name?: string;
   resting?: boolean;
+  t?: number;
 }
 interface OceanStateLike {
   players: { forEach(cb: (p: JellyLike, id: string) => void): void };
@@ -305,6 +309,8 @@ class Network {
           growth: p.growth ?? 0,
           name: p.name ?? "",
           resting: p.resting ?? false,
+          offset: null,
+          lastT: -1,
           buffer: [],
         };
         this.remotes.set(id, r);
@@ -317,7 +323,26 @@ class Network {
       r.growth = p.growth ?? 0;
       r.name = p.name ?? r.name;
       r.resting = p.resting ?? false;
-      r.buffer.push({ t: now, x: p.x, y: p.y, z: p.z, yaw: p.yaw, lean: p.lean, speed: p.speed });
+      // 새로 움직인 값이 있을 때만 쌓는다. (다른 사람의 변화로 온 상태에 같은 위치가 겹치면 멈칫거린다)
+      const sentAt = typeof p.t === "number" && p.t > 0 ? p.t : null;
+      if (sentAt !== null) {
+        if (sentAt === r.lastT) return;
+        if (sentAt < r.lastT - 1000) {
+          // 상대가 새로고침해서 시계가 처음부터 다시 시작됐다
+          r.buffer.length = 0;
+          r.offset = null;
+        }
+        r.lastT = sentAt;
+        // 가장 빨리 도착한 경우를 기준으로 시계 차이를 잡고, 아주 천천히 풀어 준다
+        const cand = now - sentAt;
+        r.offset = r.offset === null ? cand : Math.min(cand, r.offset + 0.05);
+        r.buffer.push({ t: sentAt, x: p.x, y: p.y, z: p.z, yaw: p.yaw, lean: p.lean, speed: p.speed });
+      } else {
+        const last = r.buffer[r.buffer.length - 1];
+        if (last && last.x === p.x && last.y === p.y && last.z === p.z && last.yaw === p.yaw) return;
+        r.offset = 0;
+        r.buffer.push({ t: now, x: p.x, y: p.y, z: p.z, yaw: p.yaw, lean: p.lean, speed: p.speed });
+      }
       if (r.buffer.length > MAX_BUFFER) r.buffer.shift();
     });
 

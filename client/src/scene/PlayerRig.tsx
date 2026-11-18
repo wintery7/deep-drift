@@ -255,7 +255,8 @@ export function PlayerRig() {
     // ---------------- 네트워크 ----------------
     sendTimer.current += dt;
     if (playing && sendTimer.current >= SEND_INTERVAL) {
-      sendTimer.current = 0;
+      // 남은 시간을 이어 가서 프레임 수와 상관없이 고르게 초당 20번 보낸다
+      sendTimer.current = Math.min(sendTimer.current - SEND_INTERVAL, SEND_INTERVAL);
       network.sendMove({
         x: pos.x,
         y: pos.y,
@@ -264,6 +265,7 @@ export function PlayerRig() {
         lean: runtime.lean,
         speed,
         growth: runtime.growth,
+        t: performance.now(),
       });
     }
   });
