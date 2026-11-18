@@ -1,0 +1,12 @@
+# Render Blueprint — https://render.com/docs/blueprint-spec
+# 서버 하나가 게임(WebSocket)과 빌드된 클라이언트를 같은 주소로 서빙한다.
+# 무료 플랜은 15분 동안 접속이 없으면 잠들고, 다음 접속 때 깨어나는 데 약 1분이 걸린다.
+services:
+  - type: web
+    name: deep-drift
+    runtime: docker
+    plan: free
+    region: singapore # 한국에서 가장 가까운 지역 (만든 뒤에는 바꿀 수 없음)
+    healthCheckPath: /health
+    autoDeployTrigger: commit
+    dockerfilePath: ./Dockerfile
