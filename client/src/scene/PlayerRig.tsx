@@ -103,6 +103,7 @@ export function PlayerRig() {
     // 누군가 곁에 머무는 동안에는 플랑크톤이 없어도 천천히 자란다
     if (playing && runtime.bond > 0.05) addGrowth(0.0009 * runtime.bond * dt);
     motion.grow += (runtime.growth - motion.grow) * damp(1.5, dt);
+    motion.it += ((runtime.it ? 1 : 0) - motion.it) * damp(4, dt);
 
     // ---------------- 입력 ----------------
     const input = playing && !s.paused ? readInput() : { forward: 0, strafe: 0, vertical: 0 };

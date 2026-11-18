@@ -1,7 +1,31 @@
 import { useEffect, useState } from "react";
 import { exitOcean, glow, invite, setPaused, toast } from "../game/actions.ts";
 import { setState, useGame } from "../game/store.ts";
+import { josa } from "../../../shared/names.ts";
 import { ControlsGuide, SoundControls } from "./SoundControls.tsx";
+
+/** 술래잡기 중일 때만 보이는 작은 표시 — 남은 시간과 내 역할 */
+function TagStatus() {
+  const tag = useGame((s) => s.tag);
+  const partner = useGame((s) => s.tagPartner);
+  const endsAt = useGame((s) => s.tagEndsAt);
+  const [now, setNow] = useState(Date.now());
+  useEffect(() => {
+    if (!tag) return;
+    const iv = setInterval(() => setNow(Date.now()), 500);
+    return () => clearInterval(iv);
+  }, [tag]);
+  if (!tag) return null;
+  const left = Math.max(0, Math.ceil((endsAt - now) / 1000));
+  const time = `${Math.floor(left / 60)}:${String(left % 60).padStart(2, "0")}`;
+  return (
+    <div className={`tag-status tag-status--${tag}`} role="status">
+      <span className="tag-status__dot" />
+      {tag === "it" ? `내가 술래 · ${partner}에게 닿으면 넘겨요` : `${partner}${josa(partner, "이", "가")} 술래 · 도망쳐요`}
+      <span className="tag-status__time">{time}</span>
+    </div>
+  );
+}
 
 function Presence() {
   const net = useGame((s) => s.net);
@@ -43,6 +67,7 @@ export function Hud() {
     <>
       <div className="hud">
         <Presence />
+        <TagStatus />
         <div className="hud__actions">
           <label className="hud__volume" title="환경음 볼륨">
             <span className="sr-only">환경음 볼륨</span>

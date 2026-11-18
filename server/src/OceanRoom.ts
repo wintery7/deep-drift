@@ -7,6 +7,7 @@ import {
   MSG_REST,
   SLEEPER,
   SONG_PIPES,
+  TAG,
   WAKE_SELF,
   WAKE_TOGETHER,
   WORLD,
@@ -50,14 +51,20 @@ export class OceanRoom extends Room<OceanState> {
       if (this.state.players.size > 0) this.wakeSleeper(WAKE_SELF, SLEEPER.selfWakeSeconds);
     }, SLEEPER.selfWakeEverySeconds * 1000);
 
+    // 술래잡기 판정 — 닿았는지, 끝났는지는 서버가 정해 두 사람 화면이 어긋나지 않게 한다
+    this.clock.setInterval(() => this.tickTag(), 100);
+
     this.onMessage(MSG_MOVE, (client, msg: unknown) => this.handleMove(client, msg));
     this.onMessage(MSG_GLOW, (client) => {
       const jelly = this.state.players.get(client.sessionId);
       const meta = this.meta.get(client.sessionId);
       if (!jelly || !meta) return;
       const now = Date.now();
-      if (now - meta.lastGlowAt < 1000) return; // 인사는 1초에 한 번까지
-      meta.lastGlowAt = now;
+      if (now - meta.lastGlowAt < 250) return; // 너무 잦은 인사는 무시
+      // 짧은 간격으로 두 번 인사하면 곁의 해파리에게 술래잡기를 청한다
+      const double = now - meta.lastGlowAt < TAG.doubleGlowMs;
+      meta.lastGlowAt = double ? 0 : now; // 세 번째 인사가 또 "두 번"으로 세어지지 않게
+      if (double) this.tagInvite(client.sessionId, now);
       jelly.glow = (jelly.glow + 1) % 256;
       if (Math.hypot(jelly.x - SLEEPER.x, jelly.z - SLEEPER.z) < SLEEPER.reach) {
         meta.sleeperGlowAt = now;
@@ -80,6 +87,8 @@ export class OceanRoom extends Room<OceanState> {
     this.onMessage(MSG_REST, (client, msg: unknown) => {
       const jelly = this.state.players.get(client.sessionId);
       if (!jelly || typeof msg !== "boolean") return;
+      if (msg && !jelly.resting) this.awaySince.set(client.sessionId, Date.now());
+      if (!msg) this.awaySince.delete(client.sessionId);
       jelly.resting = msg;
     });
     this.onMessage("*", () => {});
@@ -136,9 +145,11 @@ export class OceanRoom extends Room<OceanState> {
     if (!consented) {
       jelly.connected = false;
       jelly.speed = 0;
+      this.awaySince.set(client.sessionId, Date.now());
       try {
         await this.allowReconnection(client, RECONNECT_WINDOW_S);
         jelly.connected = true;
+        if (!jelly.resting) this.awaySince.delete(client.sessionId);
         const m = this.meta.get(client.sessionId);
         if (m) m.lastMoveAt = Date.now();
         return;
@@ -149,6 +160,10 @@ export class OceanRoom extends Room<OceanState> {
 
     this.state.players.delete(client.sessionId);
     this.meta.delete(client.sessionId);
+    this.inviteAt.delete(client.sessionId);
+    this.tagStartedAt.delete(client.sessionId);
+    this.tagPassedAt.delete(client.sessionId);
+    this.awaySince.delete(client.sessionId);
   }
 
   /** 잠든 빛 곁에서 인사가 건네졌다. 최근에 함께 인사한 사람이 둘 이상이면 깨어난다. */
@@ -166,6 +181,116 @@ export class OceanRoom extends Room<OceanState> {
     // 함께 깨운 인사는 한 번만 쓰인다
     this.meta.forEach((m) => (m.sleeperGlowAt = 0));
     this.wakeSleeper(WAKE_TOGETHER, SLEEPER.awakeSeconds);
+  }
+
+  // ------------------------------------------------------------------
+  // 빛 술래잡기
+  // ------------------------------------------------------------------
+
+  private inviteAt = new Map<string, number>();
+  /** 쉬는 중이거나 연결이 끊긴 시각 */
+  private awaySince = new Map<string, number>();
+  private tagStartedAt = new Map<string, number>();
+  private tagPassedAt = new Map<string, number>();
+
+  private distance(a: Jelly, b: Jelly) {
+    return Math.hypot(a.x - b.x, a.y - b.y, a.z - b.z);
+  }
+
+  /** 가장 가까운 해파리에게 청한다. 상대가 이미 나에게 청해 두었다면 바로 시작한다. */
+  private tagInvite(id: string, now: number) {
+    const me = this.state.players.get(id);
+    if (!me || me.tagWith || !me.connected) return;
+    let best = "";
+    let bestD: number = TAG.inviteRange;
+    this.state.players.forEach((p, pid) => {
+      if (pid === id || !p.connected || p.resting || p.tagWith) return;
+      const d = this.distance(me, p);
+      if (d < bestD) {
+        best = pid;
+        bestD = d;
+      }
+    });
+    if (!best) return;
+    const other = this.state.players.get(best)!;
+    if (other.inviteTo === id && now - (this.inviteAt.get(best) ?? 0) < TAG.inviteExpireMs) {
+      this.startTag(id, best, now);
+    } else {
+      me.inviteTo = best;
+      this.inviteAt.set(id, now);
+    }
+  }
+
+  private startTag(a: string, b: string, now: number) {
+    const A = this.state.players.get(a);
+    const B = this.state.players.get(b);
+    if (!A || !B) return;
+    A.inviteTo = "";
+    B.inviteTo = "";
+    A.tagWith = b;
+    B.tagWith = a;
+    const aIsIt = Math.random() < 0.5;
+    A.it = aIsIt;
+    B.it = !aIsIt;
+    for (const id of [a, b]) {
+      this.tagStartedAt.set(id, now);
+      this.tagPassedAt.set(id, now);
+    }
+  }
+
+  private endTag(p: Jelly | undefined) {
+    if (!p) return;
+    p.tagWith = "";
+    p.it = false;
+  }
+
+  private tickTag() {
+    const now = Date.now();
+    const players = this.state.players;
+    players.forEach((p, id) => {
+      // 청: 시간이 지나거나, 멀어지거나, 상대가 다른 놀이를 시작하면 사라진다
+      if (p.inviteTo) {
+        const t = players.get(p.inviteTo);
+        if (
+          !t ||
+          !t.connected ||
+          !p.connected ||
+          t.tagWith ||
+          now - (this.inviteAt.get(id) ?? 0) > TAG.inviteExpireMs ||
+          this.distance(p, t) > TAG.inviteBreakDistance
+        ) {
+          p.inviteTo = "";
+        }
+      }
+
+      // 놀이: 한 쌍을 한 번만 본다
+      if (!p.tagWith) return;
+      const q = players.get(p.tagWith);
+      if (!q || q.tagWith !== id) {
+        this.endTag(p);
+        return;
+      }
+      if (id > p.tagWith) return;
+      const d = this.distance(p, q);
+      const away = (pid: string) => now - (this.awaySince.get(pid) ?? now) > TAG.awayGraceMs;
+      if (
+        away(id) ||
+        away(p.tagWith) ||
+        now - (this.tagStartedAt.get(id) ?? now) > TAG.durationMs ||
+        d > TAG.breakDistance
+      ) {
+        this.endTag(p);
+        this.endTag(q);
+        return;
+      }
+      const present = p.connected && q.connected && !p.resting && !q.resting;
+      if (present && d < TAG.tagRadius && now - (this.tagPassedAt.get(id) ?? 0) > TAG.immuneMs) {
+        p.it = !p.it;
+        q.it = !q.it;
+        this.tagPassedAt.set(id, now);
+        this.tagPassedAt.set(p.tagWith, now);
+      }
+    });
   }
 
   private sleepTimer: { clear(): void } | null = null;

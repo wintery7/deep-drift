@@ -26,6 +26,12 @@ export interface RemoteJelly {
   name: string;
   /** 쉬는 중 */
   resting: boolean;
+  /** 술래잡기를 청한 상대 */
+  inviteTo: string;
+  /** 함께 술래잡기 중인 상대 */
+  tagWith: string;
+  /** 술래인가 */
+  it: boolean;
   /** 스냅샷 시각은 보낸 쪽 시계 기준. 내 시계 - offset = 보낸 쪽 시계 */
   offset: number | null;
   lastT: number;
@@ -46,6 +52,9 @@ interface JellyLike {
   name?: string;
   resting?: boolean;
   t?: number;
+  inviteTo?: string;
+  tagWith?: string;
+  it?: boolean;
 }
 interface OceanStateLike {
   players: { forEach(cb: (p: JellyLike, id: string) => void): void };
@@ -65,6 +74,11 @@ export const ocean = {
   sleeperStirs: 0,
   sleeperWakes: 0,
   sleeperWakeKind: 0,
+  /** 내 sessionId와 술래잡기 상태 */
+  myId: "",
+  inviteTo: "",
+  tagWith: "",
+  it: false,
 };
 
 type NoteListener = (i: number) => void;
@@ -144,6 +158,9 @@ class Network {
     }
     this.clearRemotes();
     this.resting = false;
+    ocean.inviteTo = "";
+    ocean.tagWith = "";
+    ocean.it = false;
     setState({ net: "offline" });
   }
 
@@ -246,13 +263,12 @@ class Network {
     }
     setState({ net: "online" });
     this.initialSync = true;
-    // 재접속했을 때 쉬는 중 상태를 다시 알려 준다
-    if (this.resting) {
-      try {
-        room.send(MSG_REST, true);
-      } catch {
-        /* noop */
-      }
+    // 연결될 때마다 지금의 쉬는 중 상태를 알려 준다. 끊긴 사이에 쉬다가 돌아왔다면 서버에는
+    // 끊기기 전 값(쉬는 중)이 남아 있으므로, 해제(false)도 꼭 다시 보내야 한다.
+    try {
+      room.send(MSG_REST, this.resting);
+    } catch {
+      /* noop */
     }
 
     ocean.synced = false;
@@ -289,6 +305,10 @@ class Network {
 
     state.players.forEach((p, id) => {
       if (id === room.sessionId) {
+        ocean.myId = id;
+        ocean.inviteTo = p.inviteTo ?? "";
+        ocean.tagWith = p.tagWith ?? "";
+        ocean.it = p.it ?? false;
         // 처음 입장할 때만 서버가 정해 준 자리에서 시작한다.
         if (!this.spawned) {
           this.spawned = true;
@@ -309,6 +329,9 @@ class Network {
           growth: p.growth ?? 0,
           name: p.name ?? "",
           resting: p.resting ?? false,
+          inviteTo: p.inviteTo ?? "",
+          tagWith: p.tagWith ?? "",
+          it: p.it ?? false,
           offset: null,
           lastT: -1,
           buffer: [],
@@ -323,6 +346,9 @@ class Network {
       r.growth = p.growth ?? 0;
       r.name = p.name ?? r.name;
       r.resting = p.resting ?? false;
+      r.inviteTo = p.inviteTo ?? "";
+      r.tagWith = p.tagWith ?? "";
+      r.it = p.it ?? false;
       // 새로 움직인 값이 있을 때만 쌓는다. (다른 사람의 변화로 온 상태에 같은 위치가 겹치면 멈칫거린다)
       const sentAt = typeof p.t === "number" && p.t > 0 ? p.t : null;
       if (sentAt !== null) {

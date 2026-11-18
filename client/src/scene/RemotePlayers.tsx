@@ -13,7 +13,7 @@ import {
 import { WORLD } from "../../../shared/world.ts";
 import { audio } from "../audio/AudioEngine.ts";
 import { clamp, lerpAngle, runtime } from "../game/runtime.ts";
-import { network, type Snapshot } from "../net/network.ts";
+import { network, ocean, type Snapshot } from "../net/network.ts";
 import { Jellyfish } from "./Jellyfish.tsx";
 import { Trail } from "./Trail.tsx";
 import { NameLabel } from "./NameLabel.tsx";
@@ -119,7 +119,8 @@ function RemoteJellyfish({ id }: { id: string }) {
     glowSeen: -1,
     rest: 0,
   });
-  const [resting, setResting] = useState(false);
+  const [sub, setSub] = useState("");
+  const [far, setFar] = useState(false);
   const remote = network.remotes.get(id);
   const variant = remote?.variant ?? 0;
 
@@ -142,7 +143,14 @@ function RemoteJellyfish({ id }: { id: string }) {
     const t = clock.elapsedTime + st.bob;
     _pos.set(_sample.x, _sample.y, _sample.z);
     // 쉬는 중이면 조금 가라앉아 졸듯이 천천히 맥동한다
-    if (r.resting !== resting) setResting(r.resting);
+    // 이름표 아래 한 줄: 나에게 놀자고 청함 > 술래 > 쉬는 중
+    const invitingMe = !!ocean.myId && r.inviteTo === ocean.myId && !ocean.tagWith;
+    const nextSub = invitingMe ? "같이 놀자고 해요 · E 두 번" : r.tagWith && r.it ? "술래" : r.resting ? "쉬는 중" : "";
+    if (nextSub !== sub) setSub(nextSub);
+    // 함께 술래잡기 중인 상대의 이름은 멀리서도 보인다
+    const nextFar = !!ocean.tagWith && ocean.tagWith === id;
+    if (nextFar !== far) setFar(nextFar);
+    motion.it += ((r.tagWith && r.it ? 1 : 0) - motion.it) * (1 - Math.exp(-4 * dt));
     st.rest += ((r.resting ? 1 : 0) - st.rest) * (1 - Math.exp(-0.8 * dt));
     _pos.y -= st.rest * 1.2;
 
@@ -245,7 +253,7 @@ function RemoteJellyfish({ id }: { id: string }) {
         <Jellyfish variant={variant} motion={motion} />
       </group>
       <Trail target={group} motion={motion} variant={variant} />
-      <NameLabel target={group} name={remote?.name ?? ""} resting={resting} />
+      <NameLabel target={group} name={remote?.name ?? ""} sub={sub} far={far} />
       <points geometry={thread.geometry} material={thread.material} frustumCulled={false} renderOrder={6} />
     </>
   );

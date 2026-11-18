@@ -1,7 +1,7 @@
-import { PUBLIC_SEA } from "../../../shared/world.ts";
+import { PUBLIC_SEA, TAG } from "../../../shared/world.ts";
 import { randomNameParts } from "../../../shared/names.ts";
 import { audio } from "../audio/AudioEngine.ts";
-import { network } from "../net/network.ts";
+import { network, ocean } from "../net/network.ts";
 import { clearInput } from "./input.ts";
 import { runtime } from "./runtime.ts";
 import { getState, setState, subscribe } from "./store.ts";
@@ -67,8 +67,20 @@ export function glow() {
   const s = getState();
   if (s.phase !== "playing" || s.paused) return;
   const now = performance.now();
-  if (now - lastGlow < 1200) return;
-  lastGlow = now;
+  if (now - lastGlow < 300) return;
+  const double = now - lastGlow < TAG.doubleGlowMs;
+  lastGlow = double ? 0 : now;
+  if (double && !ocean.tagWith && !network.remotes.size) {
+    toast("곁에 함께 놀 해파리가 없어요. 누군가 오면 E를 두 번 눌러 술래잡기를 청해 보세요.", 5000);
+  } else if (double && !ocean.tagWith) {
+    // 서버와 같은 기준으로 곁에 청할 해파리가 있는지 미리 본다 (화면에 보이는 위치 기준)
+    let near = false;
+    network.remotes.forEach((r) => {
+      const s = r.buffer[r.buffer.length - 1];
+      if (s && r.connected && !r.resting && !r.tagWith && Math.hypot(s.x - runtime.pos.x, s.y - runtime.pos.y, s.z - runtime.pos.z) < TAG.inviteRange) near = true;
+    });
+    if (!near) toast("술래잡기를 청하려면 다른 해파리 곁으로 더 다가가요.", 4000);
+  }
   runtime.flash = true;
   runtime.glows++;
   network.sendGlow();

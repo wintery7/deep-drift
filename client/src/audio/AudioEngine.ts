@@ -188,6 +188,30 @@ class AudioEngine {
     });
   }
 
+  /** 술래가 넘어갈 때의 "톡" — 짧고 통통 튀는 두 음 */
+  tok(start = false) {
+    const ctx = this.ctx;
+    if (!ctx || !this.active || ctx.state !== "running") return;
+    const now = ctx.currentTime;
+    const notes = start ? [587.33, 880.0, 1174.66] : [880.0, 1318.5];
+    notes.forEach((f, i) => {
+      const t = now + i * 0.09;
+      const osc = ctx.createOscillator();
+      osc.type = "triangle";
+      osc.frequency.setValueAtTime(f * 0.9, t);
+      osc.frequency.exponentialRampToValueAtTime(f, t + 0.03);
+      const g = ctx.createGain();
+      g.gain.setValueAtTime(0, t);
+      g.gain.linearRampToValueAtTime(0.09, t + 0.008);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + 0.35);
+      osc.connect(g);
+      g.connect(this.sfx);
+      g.connect(this.sfxReverb);
+      osc.start(t);
+      osc.stop(t + 0.4);
+    });
+  }
+
   /** 잠든 빛이 뒤척일 때 — 아주 낮고 긴 숨 */
   stir(pos: Vector3) {
     const ctx = this.ctx;

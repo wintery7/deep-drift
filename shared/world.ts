@@ -62,6 +62,29 @@ export const SLEEPER = {
 export const WAKE_TOGETHER = 1;
 export const WAKE_SELF = 2;
 
+/**
+ * 빛 술래잡기 — 서로 동의한 두 사람만 한다.
+ * 곁의 해파리에게 E를 두 번 누르면 놀자는 빛이 가고, 상대도 두 번 누르면 시작한다.
+ */
+export const TAG = {
+  /** 이 거리 안의 가장 가까운 해파리에게 청한다 */
+  inviteRange: 12,
+  /** 인사 두 번 사이 간격이 이보다 짧으면 "놀자" 신호 */
+  doubleGlowMs: 1300,
+  inviteExpireMs: 20000,
+  /** 청한 사람과 이만큼 멀어지면 청이 사라진다 */
+  inviteBreakDistance: 25,
+  durationMs: 120000,
+  /** 술래가 이 거리 안으로 닿으면 넘어간다 */
+  tagRadius: 2.2,
+  /** 넘겨받은 직후 바로 되잡을 수 없는 시간 */
+  immuneMs: 3000,
+  /** 둘이 이만큼 멀어지면 끝난다 */
+  breakDistance: 40,
+  /** 쉬는 중이거나 연결이 끊긴 상태가 이만큼 이어지면 끝난다 (잠깐 다른 탭에 다녀오는 건 괜찮다) */
+  awayGraceMs: 8000,
+} as const;
+
 /** 노래하는 산호: 무리 수 × 무리당 관 수 */
 export const SONG_CHOIRS = 5;
 export const SONG_PIPES_PER_CHOIR = 6;

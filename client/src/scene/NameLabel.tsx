@@ -11,10 +11,11 @@ const SHOW_FAR = 13;
 
 /**
  * 다른 해파리 위에 떠오르는 이름표. 가까이 갔을 때만 은은하게 보이고, 멀어지면 사라진다.
- * 쉬는 중이면 이름 아래에 작게 "쉬는 중"이 붙는다.
+ * 이름 아래에는 상태가 한 줄 붙는다 (놀자고 청함 · 술래 · 쉬는 중).
+ * far면 멀리서도 보인다 (함께 술래잡기 중인 상대).
  * 해파리가 기울어도 흔들리지 않도록 회전을 따르지 않고 위치만 따라간다.
  */
-export function NameLabel({ target, name, resting }: { target: RefObject<Group | null>; name: string; resting: boolean }) {
+export function NameLabel({ target, name, sub, far = false }: { target: RefObject<Group | null>; name: string; sub: string; far?: boolean }) {
   const sprite = useRef<Sprite>(null);
   const opacity = useRef(0);
 
@@ -41,14 +42,14 @@ export function NameLabel({ target, name, resting }: { target: RefObject<Group |
     ctx.shadowBlur = 10;
     ctx.fillStyle = "rgba(214, 224, 246, 0.95)";
     ctx.font = `500 40px ${font}`;
-    ctx.fillText(name, W / 2, resting ? 38 : H / 2);
-    if (resting) {
-      ctx.fillStyle = "rgba(190, 204, 236, 0.75)";
+    ctx.fillText(name, W / 2, sub ? 38 : H / 2);
+    if (sub) {
+      ctx.fillStyle = sub === "술래" ? "rgba(255, 196, 140, 0.95)" : "rgba(190, 204, 236, 0.8)";
       ctx.font = `400 28px ${font}`;
-      ctx.fillText("쉬는 중", W / 2, 84);
+      ctx.fillText(sub, W / 2, 84);
     }
     texture.needsUpdate = true;
-  }, [canvas, texture, name, resting]);
+  }, [canvas, texture, name, sub]);
 
   useEffect(
     () => () => {
@@ -66,7 +67,9 @@ export function NameLabel({ target, name, resting }: { target: RefObject<Group |
     s.position.copy(g.position);
     s.position.y += 1.9;
     const d = g.position.distanceTo(runtime.pos);
-    const want = d < SHOW_NEAR ? 1 : d > SHOW_FAR ? 0 : 1 - (d - SHOW_NEAR) / (SHOW_FAR - SHOW_NEAR);
+    const near = far ? 40 : SHOW_NEAR;
+    const fade = far ? 60 : SHOW_FAR;
+    const want = d < near ? 1 : d > fade ? 0 : 1 - (d - near) / (fade - near);
     opacity.current += (want - opacity.current) * (1 - Math.exp(-3 * dt));
     material.opacity = opacity.current * 0.85;
     s.visible = name !== "" && opacity.current > 0.01;

@@ -23,6 +23,8 @@ export const runtime = {
   /** 누군가의 뒤를 따라 유영하는 중인가 */
   following: false,
   followAccum: 0,
+  /** 내가 술래인가 (술래잡기 중일 때만) */
+  it: false,
 };
 
 /** 내 해파리의 위치를 셰이더에 전하는 공용 uniform — 지나가면 산호가 은은히 밝아진다 */

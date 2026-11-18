@@ -67,6 +67,13 @@ export function ControlsGuide() {
       </li>
       <li>
         <span className="keys__caps">
+          <kbd>E</kbd>
+          <kbd>E</kbd>
+        </span>
+        <span>곁의 해파리와 술래잡기</span>
+      </li>
+      <li>
+        <span className="keys__caps">
           <kbd>드래그</kbd>
         </span>
         <span>둘러보기</span>

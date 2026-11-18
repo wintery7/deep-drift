@@ -10,6 +10,7 @@ import { SingingCoral } from "./SingingCoral.tsx";
 import { Sleeper } from "./Sleeper.tsx";
 import { PlayerRig } from "./PlayerRig.tsx";
 import { RemotePlayers } from "./RemotePlayers.tsx";
+import { TagDirector } from "./TagDirector.tsx";
 
 /** ?quality=0|1|2 로 화질 단계를 고정한다 (자동 조절을 끈다) — 성능 확인용 */
 function fixedQuality(): number | null {
@@ -53,6 +54,7 @@ export function OceanScene() {
       <SingingCoral />
       <PlayerRig />
       <RemotePlayers />
+      <TagDirector />
       <EffectComposer multisampling={QUALITY_MSAA[quality]}>
         <Bloom mipmapBlur intensity={0.85} luminanceThreshold={0.42} luminanceSmoothing={0.35} radius={0.75} />
         <Vignette eskil={false} offset={0.22} darkness={0.62} />

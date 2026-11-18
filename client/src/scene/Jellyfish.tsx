@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef } from "react";
 import { useFrame } from "@react-three/fiber";
-import { AdditiveBlending, DoubleSide, type Mesh, type MeshBasicMaterial, type PointLight } from "three";
+import { AdditiveBlending, Color, DoubleSide, type Mesh, type MeshBasicMaterial, type PointLight } from "three";
 import { VARIANTS } from "../game/runtime.ts";
 import { bellGeometry, createJellyMaterials, tentacleGeometry, type JellyMotion } from "./jelly.ts";
 
@@ -12,6 +12,9 @@ interface Props {
 }
 
 const LIGHT_INTENSITY = 45;
+/** 술래의 빛 */
+export const IT_COLOR = new Color("#ff7414");
+export const IT_GLOW = new Color("#ffb060");
 
 /** 플레이어 해파리 한 마리. 위치·회전은 부모 group이 정하고, 여기서는 생김새와 맥동만 담당한다. */
 export function Jellyfish({ variant, motion, light = false }: Props) {
@@ -52,6 +55,9 @@ export function Jellyfish({ variant, motion, light = false }: Props) {
       u.uFlash.value = flash;
       u.uBoost.value = motion.boost;
       u.uGrow.value = motion.grow;
+      // 술래는 주황빛으로 물든다
+      u.uColor.value.set(look.color).lerp(IT_COLOR, motion.it);
+      u.uGlow.value.set(look.glow).lerp(IT_GLOW, motion.it);
       u.uVelLocal.value.copy(motion.velLocal);
     }
     if (core.current) {

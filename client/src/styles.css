@@ -557,3 +557,42 @@ kbd {
   font-weight: 500;
   margin-right: 2px;
 }
+
+/* ------------------------------------------------------------------ */
+/* 빛 술래잡기                                                          */
+/* ------------------------------------------------------------------ */
+
+.tag-status {
+  position: absolute;
+  top: 58px;
+  left: 20px;
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  padding: 7px 14px;
+  border-radius: 999px;
+  background: rgba(60, 30, 10, 0.45);
+  border: 1px solid rgba(255, 180, 110, 0.35);
+  backdrop-filter: blur(10px);
+  color: #ffe6cc;
+  font-size: 13px;
+  pointer-events: none;
+  animation: fade-in 0.4s ease both;
+}
+.tag-status--runner {
+  background: var(--glass);
+  border-color: var(--glass-line);
+  color: var(--ink-soft);
+}
+.tag-status__dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #ff9a3c;
+  box-shadow: 0 0 10px #ff9a3c;
+}
+.tag-status__time {
+  font-variant-numeric: tabular-nums;
+  color: var(--ink-faint);
+  margin-left: 2px;
+}

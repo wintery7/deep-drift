@@ -4,6 +4,7 @@ import { AdditiveBlending, BufferGeometry, Color, Float32BufferAttribute, Shader
 import { WORLD } from "../../../shared/world.ts";
 import { VARIANTS } from "../game/runtime.ts";
 import type { JellyMotion } from "./jelly.ts";
+import { IT_GLOW } from "./Jellyfish.tsx";
 
 /** 꼬리빛을 이루는 점의 최대 개수와 기록 간격(초). 다 자라면 최고 속도에서 약 27 units 길이가 된다. */
 const MAX = 64;
@@ -121,6 +122,8 @@ export function Trail({ target, motion, variant }: { target: RefObject<Group | n
     const u = material.uniforms;
     u.uLen.value = MIN_LEN + motion.grow * (MAX - MIN_LEN);
     u.uGrow.value = motion.grow;
+    if (motion.it > 0.001) u.uColor.value.set(VARIANTS[variant % VARIANTS.length].glow).lerp(IT_GLOW, motion.it);
+    else u.uColor.value.set(VARIANTS[variant % VARIANTS.length].glow);
     u.uOpacity.value = motion.opacity * (0.55 + 0.35 * motion.grow + 0.3 * motion.boost);
     u.uTime.value = clock.elapsedTime;
     u.uPixelRatio.value = gl.getPixelRatio();

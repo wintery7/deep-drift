@@ -27,6 +27,8 @@ export interface JellyMotion {
   boost: number;
   /** 0..1 자람 — 촉수가 길어지고 조금 더 밝아진다 */
   grow: number;
+  /** 0..1 술래의 주황빛 */
+  it: number;
 }
 
 export const createMotion = (): JellyMotion => ({
@@ -37,6 +39,7 @@ export const createMotion = (): JellyMotion => ({
   flash: 0,
   boost: 0,
   grow: 0,
+  it: 0,
 });
 
 // ---------------------------------------------------------------------

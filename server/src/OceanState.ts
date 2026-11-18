@@ -15,6 +15,12 @@ export class Jelly extends Schema {
   @type("string") name = "";
   /** 쉬는 중 (일시정지했거나 다른 탭으로 가 있음) */
   @type("boolean") resting = false;
+  /** 술래잡기를 청한 상대의 sessionId (없으면 "") */
+  @type("string") inviteTo = "";
+  /** 함께 술래잡기 중인 상대의 sessionId (없으면 "") */
+  @type("string") tagWith = "";
+  /** 술래인가 */
+  @type("boolean") it = false;
   /** 인사할 때마다 1씩 늘어난다 (값이 바뀌면 다른 클라이언트가 빛을 재생) */
   @type("uint8") glow = 0;
   /** 0..1 자람 — 촉수와 꼬리빛의 길이 */

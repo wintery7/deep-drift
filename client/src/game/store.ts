@@ -25,6 +25,12 @@ export interface GameState {
   sea: string;
   /** 화면 아래에 잠깐 떠오르는 안내 문구 */
   toast: string;
+  /** 술래잡기: "" (안 함) · "it" (내가 술래) · "runner" (도망) */
+  tag: "" | "it" | "runner";
+  /** 술래잡기 상대의 이름 */
+  tagPartner: string;
+  /** 술래잡기가 끝나는 시각 (Date.now 기준) */
+  tagEndsAt: number;
 }
 
 const STORAGE_KEY = "deep-drift:prefs";
@@ -77,6 +83,9 @@ let state: GameState = {
   others: 0,
   sea: seaFromUrl(),
   toast: "",
+  tag: "",
+  tagPartner: "",
+  tagEndsAt: 0,
   ...loadPrefs(),
 };
 
